@@ -7,12 +7,12 @@ import json
 import requests
 from datetime import datetime, date
 from typing import Dict, List, Any, Optional
-from fuzzywuzzy import fuzz
+from difflib import SequenceMatcher
 from dataclasses import dataclass
 
 from config.settings import settings
 from src.utils.logging import get_logger
-from src.utils.exceptions import APIError, DataValidationError
+from src.utils.exceptions import APIError, ValidationError
 from src.utils.retry import retry_on_exception, API_RETRY_CONFIG
 from src.utils.monitoring import metrics_collector
 
@@ -235,7 +235,7 @@ class QuiverClient:
             
         Raises:
             APIError: For API failures
-            DataValidationError: For data validation issues
+            ValidationError: For data validation issues
         """
         if target_date is None:
             target_date = date.today()
@@ -252,7 +252,7 @@ class QuiverClient:
             
             # Validate response structure
             if not isinstance(raw_data, list):
-                raise DataValidationError(
+                raise ValidationError(
                     f"Expected list response from Quiver API, got {type(raw_data)}"
                 )
             
@@ -278,7 +278,7 @@ class QuiverClient:
         except APIError:
             raise
         except Exception as e:
-            raise DataValidationError(f"Error processing congressional trades: {e}")
+            raise ValidationError(f"Error processing congressional trades: {e}")
     
     def _parse_trade(self, trade_data: Dict[str, Any]) -> Optional[CongressionalTrade]:
         """
@@ -407,7 +407,7 @@ class QuiverClient:
         matches = []
         
         for politician in target_politicians:
-            similarity = fuzz.ratio(politician.lower(), trade.politician.lower()) / 100.0
+            similarity = SequenceMatcher(None, politician.lower(), trade.politician.lower()).ratio()
             
             if similarity >= self.match_threshold:
                 matches.append(politician)

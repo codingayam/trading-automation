@@ -54,7 +54,7 @@ class MetricsCollector:
         with self.lock:
             self.metrics[name].append(metric)
         
-        logger.performance_metric(name, value, **tags)
+        logger.performance_metric(name, value, **(tags or {}))
     
     def record_execution_time(self, operation: str, execution_time: float,
                             tags: Optional[Dict[str, str]] = None):

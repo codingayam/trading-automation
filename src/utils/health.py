@@ -4,8 +4,16 @@ Provides HTTP endpoints for monitoring system health and status.
 """
 from flask import Flask, jsonify, request
 from typing import Dict, Any
+from enum import Enum
 import threading
 import time
+
+class HealthStatus(Enum):
+    """Health status enumeration."""
+    HEALTHY = "healthy"
+    DEGRADED = "degraded"
+    UNHEALTHY = "unhealthy"
+    DISABLED = "disabled"
 
 from src.utils.monitoring import health_checker, metrics_collector, system_monitor
 from src.utils.logging import get_logger

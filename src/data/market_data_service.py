@@ -14,7 +14,7 @@ import pytz
 
 from config.settings import settings
 from src.utils.logging import get_logger
-from src.utils.exceptions import APIError, DataValidationError
+from src.utils.exceptions import APIError, ValidationError
 from src.utils.monitoring import metrics_collector
 
 logger = get_logger(__name__)

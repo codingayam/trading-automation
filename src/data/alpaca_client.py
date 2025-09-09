@@ -11,7 +11,7 @@ from enum import Enum
 
 from alpaca.trading import TradingClient, OrderRequest, MarketOrderRequest
 from alpaca.trading.enums import OrderSide, TimeInForce, OrderStatus, OrderType
-from alpaca.trading.models import Position, Order, Account
+from alpaca.trading.models import Position, Order, TradeAccount
 from alpaca.data import StockHistoricalDataClient
 from alpaca.data.requests import StockLatestQuoteRequest
 from alpaca.common.exceptions import APIError as AlpacaAPIError
@@ -181,7 +181,7 @@ class AlpacaClient:
             logger.error(error_msg)
             raise APIError(error_msg, api_name="Alpaca")
     
-    def get_account_info(self, use_cache: bool = True) -> Account:
+    def get_account_info(self, use_cache: bool = True) -> TradeAccount:
         """
         Get account information including buying power.
         
