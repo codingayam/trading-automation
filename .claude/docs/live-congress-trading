@@ -1,0 +1,110 @@
+Live Congress Trading
+get
+https://api.quiverquant.com/beta/live/congresstrading
+Returns the most recent transactions by members of U.S. Congress.
+
+Query Parameters
+normalized
+boolean
+Normalize representative/senator names
+
+representative
+string
+Congressperson's name
+
+Body
+
+application/json
+
+application/json
+responses
+/
+200
+JSON Response structure for live congress view endpoint.
+
+array of:
+Representative
+string
+required
+Name of Congressperson who made the transaction
+
+ReportDate
+string<date-time>
+required
+Date the transaction was reported
+
+TransactionDate
+string<date-time>
+required
+Date the transaction took place
+
+Ticker
+string
+required
+Ticker of shares transacted
+
+Transaction
+string
+Purchase or Sale
+
+Range
+string
+District
+string
+District of the congressperson
+
+House
+string
+Representatives or Senate
+
+Amount
+number
+Lower bound of transaction size ($). Congressional trades are reported as a range of values, this variable is the lower bound of that range
+
+Default:
+0
+Party
+string
+required
+Political party of the congressperson who made the trade
+
+TickerType
+string
+Reported type of asset traded. Note: CS and ST are commonly used as abbreviated for common stock
+
+Description
+string
+Transaction description
+
+ExcessReturn
+number
+Estimated return of stock compared to return of S&P 500 since the transaction date
+
+PriceChange
+number
+Percentage change in stock price since the transaction date
+
+SPYChange
+number
+Percentage change in S&P 500 since the transaction date
+
+last_modified
+any
+Date that Quiver last updated the details of this transaction
+
+Sample code
+import http.client
+
+conn = http.client.HTTPSConnection("api.quiverquant.com")
+
+headers = {
+    'Accept': "application/json",
+    'Authorization': "Bearer fde8b6bd5f6f33a84e921c7a55ed61538b93833c"
+}
+
+conn.request("GET", "/beta/live/congresstrading?representative=Judy+Chu", headers=headers)
+
+res = conn.getresponse()
+data = res.read()
+
+print(data.decode("utf-8"))

@@ -1,0 +1,43 @@
+# Core trading and API dependencies
+alpaca-py==0.8.0
+yfinance==0.2.18
+requests==2.31.0
+
+# Web framework for dashboard
+flask==2.3.0
+gunicorn==21.2.0
+
+# Configuration and environment
+python-dotenv==1.0.0
+
+# Data processing and utilities  
+pandas==2.1.0
+numpy==1.24.3
+
+# Database (SQLite is built-in, but for future PostgreSQL support)
+psycopg2-binary==2.9.7
+
+# System monitoring
+psutil==5.9.5
+
+# Retry logic and HTTP requests
+tenacity==8.2.3
+
+# Date and time utilities
+python-dateutil==2.8.2
+pytz==2023.3
+
+# Fuzzy string matching for politician names
+fuzzywuzzy==0.18.0
+python-Levenshtein==0.21.1
+
+# JSON handling and data validation
+pydantic==2.3.0
+marshmallow==3.20.1
+
+# Logging enhancements
+structlog==23.1.0
+
+# Testing (will be in requirements-dev.txt but needed for CI)
+pytest==7.4.0
+pytest-cov==4.1.0

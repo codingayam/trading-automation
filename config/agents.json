@@ -1,0 +1,101 @@
+{
+  "agents": [
+    {
+      "id": "transportation_committee",
+      "name": "Transportation & Infrastructure Committee Agent",
+      "type": "committee",
+      "description": "Tracks trades by members of the House Transportation and Infrastructure Committee",
+      "politicians": [
+        "Peter DeFazio",
+        "Sam Graves",
+        "Eleanor Holmes Norton", 
+        "Rick Larsen",
+        "Garret Graves",
+        "Donald Payne Jr.",
+        "Mark DeSaulnier",
+        "Stacey Plaskett",
+        "Stephen Lynch",
+        "Salud Carbajal"
+      ],
+      "enabled": true,
+      "parameters": {
+        "minimum_trade_value": 50000,
+        "position_size_type": "fixed",
+        "position_size_value": 100,
+        "match_threshold": 0.85
+      }
+    },
+    {
+      "id": "josh_gottheimer",
+      "name": "Josh Gottheimer Agent",
+      "type": "individual",
+      "description": "Tracks trades by Representative Josh Gottheimer (D-NJ)",
+      "politicians": [
+        "Josh Gottheimer"
+      ],
+      "enabled": true,
+      "parameters": {
+        "minimum_trade_value": 50000,
+        "position_size_type": "fixed", 
+        "position_size_value": 100,
+        "match_threshold": 0.85
+      }
+    },
+    {
+      "id": "sheldon_whitehouse", 
+      "name": "Sheldon Whitehouse Agent",
+      "type": "individual",
+      "description": "Tracks trades by Senator Sheldon Whitehouse (D-RI)",
+      "politicians": [
+        "Sheldon Whitehouse"
+      ],
+      "enabled": true,
+      "parameters": {
+        "minimum_trade_value": 50000,
+        "position_size_type": "fixed",
+        "position_size_value": 100,
+        "match_threshold": 0.85
+      }
+    },
+    {
+      "id": "nancy_pelosi",
+      "name": "Nancy Pelosi Agent", 
+      "type": "individual",
+      "description": "Tracks trades by Representative Nancy Pelosi (D-CA)",
+      "politicians": [
+        "Nancy Pelosi"
+      ],
+      "enabled": true,
+      "parameters": {
+        "minimum_trade_value": 50000,
+        "position_size_type": "fixed",
+        "position_size_value": 100,
+        "match_threshold": 0.85
+      }
+    },
+    {
+      "id": "dan_meuser",
+      "name": "Dan Meuser Agent",
+      "type": "individual", 
+      "description": "Tracks trades by Representative Dan Meuser (R-PA)",
+      "politicians": [
+        "Dan Meuser"
+      ],
+      "enabled": true,
+      "parameters": {
+        "minimum_trade_value": 50000,
+        "position_size_type": "fixed",
+        "position_size_value": 100,
+        "match_threshold": 0.85
+      }
+    }
+  ],
+  "global_parameters": {
+    "execution_time": "21:30",
+    "timezone": "US/Eastern",
+    "max_concurrent_trades": 10,
+    "trade_timeout_seconds": 300,
+    "position_update_interval": 3600,
+    "performance_calculation_interval": 86400
+  }
+}
