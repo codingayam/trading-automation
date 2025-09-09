@@ -5,6 +5,7 @@ requests==2.31.0
 
 # Web framework for dashboard
 flask==2.3.0
+flask-cors==4.0.0
 gunicorn==21.2.0
 
 # Configuration and environment
