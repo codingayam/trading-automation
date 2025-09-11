@@ -49,14 +49,58 @@ def main():
             return 1
         
         print("✅ Environment variables configured")
+        print("🔧 Testing individual components...")
+        
+        # Test each component before starting
+        try:
+            from src.utils.logging import get_logger
+            logger = get_logger(__name__)
+            print("✅ Logging system initialized")
+        except Exception as e:
+            print(f"❌ Logging failed: {e}")
+            traceback.print_exc()
+            return 1
+            
+        try:
+            from config.settings import settings
+            print("✅ Settings loaded")
+        except Exception as e:
+            print(f"❌ Settings failed: {e}")
+            traceback.print_exc()
+            return 1
+            
+        try:
+            from src.data.database import DatabaseManager
+            db = DatabaseManager()
+            print("✅ Database connected")
+        except Exception as e:
+            print(f"❌ Database failed: {e}")
+            traceback.print_exc()
+            return 1
+        
+        try:
+            from src.scheduler.daily_runner import DailyRunner
+            runner = DailyRunner()
+            print("✅ Daily runner created")
+        except Exception as e:
+            print(f"❌ Daily runner failed: {e}")
+            traceback.print_exc()
+            return 1
+        
+        print("🚀 Starting main scheduler...")
         
         # Import and run the main scheduler
-        from main import main as main_scheduler
+        from main import run_scheduler
         
-        # Run scheduler command
-        sys.argv = ['main.py', 'scheduler']
-        return main_scheduler()
+        # Run the scheduler function directly
+        run_scheduler()
         
+        print("❌ Scheduler exited unexpectedly")
+        return 1
+        
+    except KeyboardInterrupt:
+        print("✅ Scheduler stopped by interrupt signal")
+        return 0
     except Exception as e:
         print(f"❌ Scheduler crashed: {e}")
         traceback.print_exc()
