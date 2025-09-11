@@ -4,34 +4,23 @@ Deploy your trading automation system to Railway with a simplified all-in-one se
 
 ## Quick Start
 
-### 1. Install Railway CLI
-```bash
-npm install -g @railway/cli
-railway login
-```
+### 1. Deploy from GitHub Repository
+1. Go to [Railway Dashboard](https://railway.app/dashboard)
+2. Click **"New Project"**
+3. Select **"Deploy from GitHub repo"**
+4. Connect your GitHub account if needed
+5. Select your repository: `codingayam/trading-automation`
+6. Choose the **main** branch
+7. Railway will automatically detect `Dockerfile.railway` and start building
 
-### 2. Create New Project
-```bash
-railway new
-# Choose: "Empty Project"
-# Give it a name like "trading-automation"
-```
+### 2. Add PostgreSQL Database
+In your Railway project dashboard:
+1. Click **"New Service"**
+2. Select **"Database"** → **"PostgreSQL"**
+3. Railway automatically sets the `DATABASE_URL` environment variable
 
-### 3. Add PostgreSQL Database
-```bash
-railway add --database postgres
-# Then select "PostgreSQL" from the list
-```
-
-Or via the Railway dashboard:
-1. Go to your project dashboard
-2. Click "New Service" 
-3. Select "Database" → "PostgreSQL"
-
-This automatically creates a PostgreSQL database and sets the `DATABASE_URL` environment variable.
-
-### 4. Set Environment Variables
-In the Railway dashboard, add these environment variables:
+### 3. Set Environment Variables
+In Railway dashboard → your app service → **Variables** tab:
 
 **Required:**
 ```
@@ -48,19 +37,14 @@ LOG_LEVEL=INFO
 DAILY_EXECUTION_TIME=21:30
 ```
 
-### 5. Deploy
-```bash
-# Connect your local repo to Railway
-railway link
-
-# Deploy
-railway up
-```
-
-That's it! Railway will:
+### 4. Automatic Deployment
+Railway will automatically:
 - Build using `Dockerfile.railway`
 - Start both the scheduler and dashboard
 - Provide a public URL for the dashboard
+- Redeploy whenever you push to GitHub
+
+That's it! Your trading automation system is now deployed and running in the cloud! 🎉
 
 ## What Gets Deployed
 
