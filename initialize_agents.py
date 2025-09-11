@@ -42,6 +42,51 @@ def main():
             if politicians:
                 print(f"     Politicians: {', '.join(politicians[:3])}{'...' if len(politicians) > 3 else ''}")
         
+        # Store agents in database for dashboard
+        logger.info("Storing agent data in database...")
+        from src.data.database import DatabaseManager
+        db = DatabaseManager()
+        
+        with db.transaction() as conn:
+            cursor = conn.cursor()
+            
+            # Create agents table if not exists
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS agents (
+                    id VARCHAR(50) PRIMARY KEY,
+                    name VARCHAR(200) NOT NULL,
+                    type VARCHAR(50) NOT NULL,
+                    description TEXT,
+                    politicians TEXT,
+                    enabled BOOLEAN DEFAULT TRUE,
+                    parameters TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            
+            # Insert agent data
+            for agent in agents:
+                politicians_str = ', '.join(getattr(agent, 'politicians', []))
+                agent_type = getattr(agent, 'type', 'unknown')
+                config = agent_factory.agent_configs.get(agent.agent_id, {})
+                
+                cursor.execute("""
+                    INSERT OR REPLACE INTO agents 
+                    (id, name, type, description, politicians, enabled, parameters)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    agent.agent_id,
+                    config.get('name', agent.agent_id),
+                    agent_type,
+                    config.get('description', ''),
+                    politicians_str,
+                    config.get('enabled', True),
+                    str(config.get('parameters', {}))
+                ))
+            
+        print(f"✅ Agent data stored in database")
+        
         # Get factory status
         status = agent_factory.get_factory_status()
         print(f"\n📊 Agent Factory Status:")
