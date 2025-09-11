@@ -65,11 +65,20 @@ def main():
                 )
             """)
             
+            # Get agent configurations from settings
+            from config.settings import settings
+            agent_configs = settings.get_enabled_agents()
+            
             # Insert agent data
             for agent in agents:
                 politicians_str = ', '.join(getattr(agent, 'politicians', []))
                 agent_type = getattr(agent, 'type', 'unknown')
-                config = agent_factory.agent_configs.get(agent.agent_id, {})
+                
+                # Find matching config
+                config = next(
+                    (cfg for cfg in agent_configs if cfg['id'] == agent.agent_id),
+                    {}
+                )
                 
                 cursor.execute("""
                     INSERT OR REPLACE INTO agents 
