@@ -218,3 +218,11 @@
 {"timestamp": "2025-09-11T11:11:52.972111", "level": "ERROR", "logger": "src.dashboard.api", "message": "Unexpected error in health_check: 'overall_status'", "module": "logging", "function": "error", "line": 88}
 {"timestamp": "2025-09-11T11:12:52.786040", "level": "ERROR", "logger": "src.dashboard.api", "message": "Unexpected error in health_check: 'overall_status'", "module": "logging", "function": "error", "line": 88}
 {"timestamp": "2025-09-11T11:13:53.298921", "level": "ERROR", "logger": "src.dashboard.api", "message": "Unexpected error in health_check: 'overall_status'", "module": "logging", "function": "error", "line": 88}
+{"timestamp": "2025-09-11T11:14:52.981805", "level": "ERROR", "logger": "src.dashboard.api", "message": "Unexpected error in health_check: 'overall_status'", "module": "logging", "function": "error", "line": 88}
+{"timestamp": "2025-09-11T11:15:52.825880", "level": "ERROR", "logger": "src.dashboard.api", "message": "Unexpected error in health_check: 'overall_status'", "module": "logging", "function": "error", "line": 88}
+{"timestamp": "2025-09-11T11:16:53.850019", "level": "ERROR", "logger": "src.dashboard.api", "message": "Unexpected error in health_check: 'overall_status'", "module": "logging", "function": "error", "line": 88}
+{"timestamp": "2025-09-11T11:17:52.938217", "level": "ERROR", "logger": "src.dashboard.api", "message": "Unexpected error in health_check: 'overall_status'", "module": "logging", "function": "error", "line": 88}
+{"timestamp": "2025-09-11T11:18:52.902280", "level": "ERROR", "logger": "src.dashboard.api", "message": "Unexpected error in health_check: 'overall_status'", "module": "logging", "function": "error", "line": 88}
+{"timestamp": "2025-09-11T11:19:52.882758", "level": "ERROR", "logger": "src.dashboard.api", "message": "Unexpected error in health_check: 'overall_status'", "module": "logging", "function": "error", "line": 88}
+{"timestamp": "2025-09-11T11:20:53.013667", "level": "ERROR", "logger": "src.dashboard.api", "message": "Unexpected error in health_check: 'overall_status'", "module": "logging", "function": "error", "line": 88}
+{"timestamp": "2025-09-11T11:21:52.674530", "level": "ERROR", "logger": "src.dashboard.api", "message": "Unexpected error in health_check: 'overall_status'", "module": "logging", "function": "error", "line": 88}
