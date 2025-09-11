@@ -12,7 +12,7 @@ gunicorn==21.2.0
 python-dotenv==1.0.0
 
 # Data processing and utilities  
-pandas==2.1.0
+pandas==1.5.3
 numpy==1.24.3
 
 # Database (SQLite is built-in, but for future PostgreSQL support)
