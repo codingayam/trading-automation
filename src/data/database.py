@@ -332,6 +332,19 @@ CREATE TABLE IF NOT EXISTS daily_performance (
     UNIQUE(agent_id, date)
 );
 
+-- Agents table: Store agent configurations and metadata for dashboard display
+CREATE TABLE IF NOT EXISTS agents (
+    id VARCHAR(50) PRIMARY KEY,
+    name VARCHAR(200) NOT NULL,
+    type VARCHAR(50) NOT NULL,
+    description TEXT,
+    politicians TEXT,
+    enabled BOOLEAN DEFAULT TRUE,
+    parameters TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Create indexes for query optimization
 CREATE INDEX IF NOT EXISTS idx_trades_agent_id ON trades(agent_id);
 CREATE INDEX IF NOT EXISTS idx_trades_trade_date ON trades(trade_date);
@@ -345,6 +358,9 @@ CREATE INDEX IF NOT EXISTS idx_positions_agent_ticker ON agent_positions(agent_i
 CREATE INDEX IF NOT EXISTS idx_performance_agent_id ON daily_performance(agent_id);
 CREATE INDEX IF NOT EXISTS idx_performance_date ON daily_performance(date);
 CREATE INDEX IF NOT EXISTS idx_performance_agent_date ON daily_performance(agent_id, date);
+
+CREATE INDEX IF NOT EXISTS idx_agents_enabled ON agents(enabled);
+CREATE INDEX IF NOT EXISTS idx_agents_type ON agents(type);
 """
 
 def initialize_database():
