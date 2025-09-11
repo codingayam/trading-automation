@@ -182,33 +182,28 @@ class AgentDetailDashboard {
         tbody.innerHTML = sortedPositions.map(position => `
             <tr class="position-row">
                 <td class="font-medium">
-                    ${this.escapeHtml(position.ticker)}
+                    ${this.escapeHtml(position.asset || position.ticker)}
                 </td>
                 <td class="text-right">
-                    ${this.formatNumber(position.quantity)}
+                    ${this.formatNumber(position.qty || Math.abs(position.quantity), 0)}
                 </td>
-                <td class="text-right">
-                    ${this.formatCurrency(position.current_price)}
+                <td class="text-center">
+                    <span class="side-badge ${(position.side || '').toLowerCase()}">${position.side || (position.quantity >= 0 ? 'Long' : 'Short')}</span>
                 </td>
                 <td class="text-right font-medium">
                     ${position.market_value_formatted || this.formatCurrency(position.market_value)}
                 </td>
-                <td class="text-right">
-                    ${position.weight_formatted || this.formatPercentage(position.weight_pct, 1)}
+                <td class="text-right ${this.getReturnClass(position.todays_pnl_percent)}">
+                    ${position.todays_pnl_percent_formatted || this.formatPercentage(position.todays_pnl_percent)}
                 </td>
-                <td class="text-right ${this.getReturnClass(position.daily_return_pct)}">
-                    ${position.daily_return_formatted || this.formatPercentage(position.daily_return_pct)}
+                <td class="text-right ${this.getReturnClass(position.todays_pnl_dollars)}">
+                    ${position.todays_pnl_dollars_formatted || this.formatCurrency(position.todays_pnl_dollars)}
                 </td>
-                <td class="text-right ${this.getReturnClass(position.since_open_return_pct)}">
-                    ${position.since_open_return_formatted || this.formatPercentage(position.since_open_return_pct)}
+                <td class="text-right ${this.getReturnClass(position.total_pnl_percent)}">
+                    ${position.total_pnl_percent_formatted || this.formatPercentage(position.total_pnl_percent)}
                 </td>
-                <td class="text-right ${this.getReturnClass(position.unrealized_pnl_pct)}">
-                    <div>
-                        ${position.unrealized_pnl_formatted || this.formatCurrency(position.unrealized_pnl)}
-                    </div>
-                    <div class="text-muted" style="font-size: 0.75rem;">
-                        (${this.formatPercentage(position.unrealized_pnl_pct)})
-                    </div>
+                <td class="text-right ${this.getReturnClass(position.total_pnl_dollars)}">
+                    ${position.total_pnl_dollars_formatted || this.formatCurrency(position.total_pnl_dollars)}
                 </td>
             </tr>
         `).join('');
@@ -247,7 +242,7 @@ class AgentDetailDashboard {
             let bVal = b[this.sortColumn] || 0;
             
             // Handle string values
-            if (this.sortColumn === 'ticker') {
+            if (this.sortColumn === 'ticker' || this.sortColumn === 'asset') {
                 aVal = String(aVal).toLowerCase();
                 bVal = String(bVal).toLowerCase();
             }

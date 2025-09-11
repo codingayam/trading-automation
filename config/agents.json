@@ -88,6 +88,28 @@
         "position_size_value": 100,
         "match_threshold": 0.85
       }
+    },
+    {
+      "id": "andy_grok",
+      "name": "Andy (Grok) Agent",
+      "type": "technical",
+      "description": "RSI-based intraday SPY trading agent that trades on oversold/overbought conditions",
+      "politicians": [],
+      "enabled": true,
+      "parameters": {
+        "target_ticker": "SPY",
+        "position_size_percent": 1.0,
+        "max_position_size": 10000,
+        "min_account_value": 1000,
+        "max_daily_trades": 3,
+        "rsi_period": 14,
+        "rsi_oversold_threshold": 30.0,
+        "rsi_overbought_threshold": 70.0,
+        "rsi_lookback_hours": 14,
+        "market_open_time": "09:30",
+        "market_close_time": "16:00",
+        "position_close_time": "15:55"
+      }
     }
   ],
   "global_parameters": {

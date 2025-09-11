@@ -243,7 +243,7 @@ class QuiverClient:
         logger.info(f"Fetching congressional trades for {target_date}")
         
         params = {
-            'date': target_date.isoformat()
+            'date': target_date.strftime('%Y%m%d')
         }
         
         try:
@@ -445,7 +445,9 @@ class QuiverClient:
         """
         try:
             # Make a simple request to test authentication
-            self._make_request(self.CONGRESS_ENDPOINT, {'date': date.today().isoformat()})
+            self._make_request(self.CONGRESS_ENDPOINT, {
+                'date': date.today().strftime('%Y%m%d')
+            })
             logger.info("Quiver API connection test successful")
             return True
         except Exception as e:

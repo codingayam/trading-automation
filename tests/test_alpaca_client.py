@@ -7,7 +7,7 @@ from unittest.mock import Mock, patch, MagicMock
 from datetime import datetime, date
 from decimal import Decimal
 
-from alpaca.trading.models import Position, Order, Account
+from alpaca.trading.models import Position, Order, AccountConfiguration
 from alpaca.trading.enums import OrderSide, TimeInForce, OrderStatus, OrderType
 from alpaca.common.exceptions import APIError as AlpacaAPIError
 

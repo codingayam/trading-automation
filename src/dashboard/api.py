@@ -14,6 +14,7 @@ from functools import wraps
 from config.settings import settings
 from src.data.database import DatabaseManager, get_agent_positions, get_agent_performance_history, get_all_agent_summaries
 from src.data.market_data_service import MarketDataService
+from src.data.alpaca_client import AlpacaClient
 from src.utils.logging import get_logger
 from src.utils.calculations import calculate_position_metrics, format_currency, format_percentage
 from src.utils.exceptions import APIError, ValidationError
@@ -25,6 +26,7 @@ logger = get_logger(__name__)
 # Initialize services
 db = DatabaseManager()
 market_data = MarketDataService()
+alpaca_client = AlpacaClient()
 
 app = Flask(__name__, 
             template_folder='templates',
@@ -35,6 +37,55 @@ CORS(app, origins=['*'])  # Configure based on your frontend domain in productio
 
 # Disable Flask's default logging to avoid conflicts
 logging.getLogger('werkzeug').setLevel(logging.WARNING)
+
+
+def calculate_agent_lifetime_return(agent_id: str, current_unrealized_pnl: float) -> float:
+    """Calculate agent's lifetime total return including realized profits."""
+    try:
+        # Get all trades for the agent
+        query = """
+        SELECT 
+            ticker,
+            SUM(CASE WHEN quantity > 0 THEN quantity * price ELSE 0 END) as total_invested,
+            SUM(CASE WHEN quantity < 0 THEN ABS(quantity) * price ELSE 0 END) as total_proceeds,
+            SUM(quantity * price) as net_cash_flow
+        FROM trades 
+        WHERE agent_id = ? AND order_status IN ('filled', 'partially_filled')
+        GROUP BY ticker
+        """
+        
+        rows = db.execute_query(query, (agent_id,))
+        
+        total_invested = 0.0
+        total_realized_pnl = 0.0
+        
+        for row in rows:
+            ticker_invested = float(row[1] or 0)  # Money spent on buys
+            ticker_proceeds = float(row[2] or 0)  # Money received from sells
+            net_cash_flow = float(row[3] or 0)   # Net cash flow for the ticker
+            
+            # For closed positions (net_cash_flow close to 0), calculate realized P&L
+            if abs(net_cash_flow) < 1.0:  # Position is essentially closed
+                realized_pnl = ticker_proceeds - ticker_invested
+                total_realized_pnl += realized_pnl
+            else:
+                # For open positions, only count the invested amount
+                if ticker_invested > 0:
+                    total_invested += ticker_invested
+        
+        # Calculate overall lifetime return
+        # Total P&L = Realized P&L (from closed positions) + Unrealized P&L (from open positions)
+        total_lifetime_pnl = total_realized_pnl + current_unrealized_pnl
+        
+        if total_invested > 0:
+            return (total_lifetime_pnl / total_invested) * 100
+        else:
+            return 0.0
+            
+    except Exception as e:
+        logger.warning(f"Could not calculate lifetime return for agent {agent_id}: {e}")
+        return 0.0
+
 
 # Cache for performance optimization (15-minute refresh)
 cache_ttl = 900  # 15 minutes
@@ -95,6 +146,70 @@ def handle_api_errors(f):
     return wrapper
 
 
+def get_real_time_agent_positions(agent_id: str) -> List[Dict[str, Any]]:
+    """Get real-time positions for an agent from Alpaca."""
+    try:
+        # Get all current Alpaca positions
+        alpaca_positions = alpaca_client.get_all_positions()
+        
+        # Get agent's trade history to determine which positions belong to this agent
+        # For now, let's use a simpler approach - get positions for tickers the agent has traded
+        agent_tickers_query = """
+        SELECT DISTINCT ticker FROM trades WHERE agent_id = ?
+        """
+        agent_ticker_rows = db.execute_query(agent_tickers_query, (agent_id,))
+        agent_tickers = [row[0] for row in agent_ticker_rows]
+        
+        # Filter Alpaca positions to only include agent's tickers
+        agent_positions = []
+        for position in alpaca_positions:
+            if position.ticker in agent_tickers:
+                # Calculate additional metrics
+                quantity = float(position.quantity)
+                market_value = float(position.market_value)
+                cost_basis = float(position.cost_basis) if hasattr(position, 'cost_basis') else 0.0
+                current_price = float(position.current_price)
+                unrealized_pnl = float(position.unrealized_pnl) if hasattr(position, 'unrealized_pnl') else 0.0
+                unrealized_pnl_percent = float(position.unrealized_pnl_percent) if hasattr(position, 'unrealized_pnl_percent') else 0.0
+                
+                # Calculate total P&L from cost basis
+                total_pnl_dollars = market_value - cost_basis if cost_basis != 0 else unrealized_pnl
+                total_pnl_percent = (total_pnl_dollars / abs(cost_basis)) if cost_basis != 0 else unrealized_pnl_percent
+                
+                # Determine side
+                side = "Short" if quantity < 0 else "Long"
+                
+                # Convert to dictionary with new column format
+                position_data = {
+                    'agent_id': agent_id,
+                    # New column format
+                    'asset': position.ticker,
+                    'qty': abs(quantity),  # Show absolute quantity
+                    'side': side,
+                    'market_value': market_value,
+                    'todays_pnl_percent': unrealized_pnl_percent * 100,  # Convert to percentage
+                    'todays_pnl_dollars': unrealized_pnl,
+                    'total_pnl_percent': total_pnl_percent * 100,  # Convert to percentage
+                    'total_pnl_dollars': total_pnl_dollars,
+                    
+                    # Keep legacy fields for compatibility
+                    'ticker': position.ticker,
+                    'quantity': quantity,
+                    'current_price': current_price,
+                    'unrealized_pnl': unrealized_pnl,
+                    'cost_basis': cost_basis,
+                    'last_updated': datetime.now().isoformat()
+                }
+                agent_positions.append(position_data)
+        
+        return agent_positions
+        
+    except Exception as e:
+        logger.error(f"Error getting real-time positions for agent {agent_id}: {e}")
+        # Fallback to database positions
+        return get_agent_positions(agent_id)
+
+
 @app.route('/api/health', methods=['GET'])
 @handle_api_errors
 def health_check():
@@ -148,7 +263,7 @@ def system_status():
 
 @app.route('/api/agents', methods=['GET'])
 @handle_api_errors
-@cache_response(ttl_seconds=900)  # 15-minute cache
+@cache_response(ttl_seconds=60)  # 1-minute cache for real-time data
 def get_agents():
     """List all agents with performance summary."""
     try:
@@ -172,22 +287,38 @@ def get_agents():
                 logger.warning(f"No configuration found for agent {agent_id}")
                 continue
             
-            # Calculate 1-day and since-open returns
-            daily_return_pct = summary.get('daily_return_pct', 0.0) or 0.0
-            total_return_pct = summary.get('total_return_pct', 0.0) or 0.0
+            # Calculate returns from real-time positions instead of stale database values
+            positions = get_real_time_agent_positions(agent_id)
+            
+            # Calculate portfolio-level returns from position P&L
+            total_portfolio_value = sum(pos.get('market_value', 0) or 0 for pos in positions)
+            total_todays_pnl = sum(pos.get('todays_pnl_dollars', 0) or 0 for pos in positions)
+            total_unrealized_pnl = sum(pos.get('total_pnl_dollars', 0) or 0 for pos in positions)
+            
+            # Calculate lifetime total return including realized profits
+            lifetime_total_return_pct = calculate_agent_lifetime_return(agent_id, total_unrealized_pnl)
+            
+            # Calculate return percentages based on portfolio value
+            daily_return_pct = 0.0
+            
+            if total_portfolio_value != 0:
+                # Today's return = today's P&L / (portfolio value - today's P&L) * 100
+                portfolio_value_yesterday = total_portfolio_value - total_todays_pnl
+                if portfolio_value_yesterday != 0:
+                    daily_return_pct = (total_todays_pnl / portfolio_value_yesterday) * 100
             
             agent_data = {
                 'agent_id': agent_id,
                 'name': agent_config['name'],
                 'type': agent_config['type'],
                 'description': agent_config.get('description', ''),
-                'total_value': float(summary.get('total_value', 0.0) or 0.0),
-                'position_count': int(summary.get('position_count', 0) or 0),
+                'total_value': float(total_portfolio_value),
+                'position_count': len([pos for pos in positions if pos.get('qty', 0) != 0]),
                 'daily_return_pct': float(daily_return_pct),
-                'total_return_pct': float(total_return_pct),
+                'total_return_pct': float(lifetime_total_return_pct),
                 'daily_return_formatted': format_percentage(daily_return_pct),
-                'total_return_formatted': format_percentage(total_return_pct),
-                'total_value_formatted': format_currency(summary.get('total_value', 0.0) or 0.0),
+                'total_return_formatted': format_percentage(lifetime_total_return_pct),
+                'total_value_formatted': format_currency(total_portfolio_value),
                 'enabled': agent_config.get('enabled', True)
             }
             
@@ -209,15 +340,15 @@ def get_agents():
 
 @app.route('/api/agents/<agent_id>', methods=['GET'])
 @handle_api_errors
-@cache_response(ttl_seconds=900)  # 15-minute cache
+@cache_response(ttl_seconds=60)  # 1-minute cache for real-time data
 def get_agent_detail(agent_id: str):
     """Detailed agent information."""
     try:
         # Get agent configuration
         agent_config = settings.get_agent_by_id(agent_id)
         
-        # Get agent positions
-        positions = get_agent_positions(agent_id)
+        # Get real-time agent positions
+        positions = get_real_time_agent_positions(agent_id)
         
         # Get recent performance history
         performance_history = get_agent_performance_history(agent_id, days=30)
@@ -232,59 +363,39 @@ def get_agent_detail(agent_id: str):
         if tickers:
             current_prices = market_data.get_batch_prices(tickers)
         
-        # Calculate detailed position metrics
+        # Use the same real-time position data as the positions endpoint
         position_details = []
         for pos in positions:
-            if pos.get('quantity', 0) <= 0:
-                continue
-                
-            ticker = pos['ticker']
-            current_price = current_prices.get(ticker, pos.get('current_price', 0))
-            
-            if not current_price:
-                logger.warning(f"No current price available for {ticker}")
+            if pos.get('quantity', 0) == 0:
                 continue
             
-            # Calculate daily and since-open returns
-            daily_return_data = market_data.calculate_daily_return(ticker)
-            since_open_return_data = market_data.calculate_since_open_return(ticker)
-            
-            # Build position detail
+            # Build position detail using new column format
             position_detail = {
-                'ticker': ticker,
-                'quantity': float(pos.get('quantity', 0)),
-                'avg_cost': float(pos.get('avg_cost', 0)),
-                'current_price': float(current_price),
-                'market_value': float(pos.get('quantity', 0)) * float(current_price),
-                'cost_basis': float(pos.get('quantity', 0)) * float(pos.get('avg_cost', 0)),
-                'unrealized_pnl': 0.0,
-                'unrealized_pnl_pct': 0.0,
-                'weight_pct': 0.0,
-                'daily_return_pct': 0.0,
-                'since_open_return_pct': 0.0
+                # New format columns
+                'asset': pos.get('asset', pos.get('ticker')),
+                'qty': pos.get('qty', abs(float(pos.get('quantity', 0)))),
+                'side': pos.get('side', 'Long' if pos.get('quantity', 0) > 0 else 'Short'),
+                'market_value': pos.get('market_value', 0),
+                'todays_pnl_percent': pos.get('todays_pnl_percent', 0),
+                'todays_pnl_dollars': pos.get('todays_pnl_dollars', 0),
+                'total_pnl_percent': pos.get('total_pnl_percent', 0),
+                'total_pnl_dollars': pos.get('total_pnl_dollars', 0),
+                
+                # Legacy format for compatibility
+                'ticker': pos.get('ticker'),
+                'quantity': pos.get('quantity', 0),
+                'current_price': pos.get('current_price', 0),
+                'unrealized_pnl': pos.get('unrealized_pnl', 0),
+                'cost_basis': pos.get('cost_basis', 0)
             }
             
-            # Calculate additional metrics
-            position_detail['unrealized_pnl'] = position_detail['market_value'] - position_detail['cost_basis']
-            if position_detail['cost_basis'] > 0:
-                position_detail['unrealized_pnl_pct'] = (position_detail['unrealized_pnl'] / position_detail['cost_basis']) * 100
-            
-            if total_value > 0:
-                position_detail['weight_pct'] = (position_detail['market_value'] / total_value) * 100
-            
-            if daily_return_data:
-                position_detail['daily_return_pct'] = daily_return_data.return_percent
-            
-            if since_open_return_data:
-                position_detail['since_open_return_pct'] = since_open_return_data.return_percent
-            
-            # Format for display
+            # Add formatted display fields
             position_detail.update({
                 'market_value_formatted': format_currency(position_detail['market_value']),
-                'unrealized_pnl_formatted': format_currency(position_detail['unrealized_pnl']),
-                'daily_return_formatted': format_percentage(position_detail['daily_return_pct']),
-                'since_open_return_formatted': format_percentage(position_detail['since_open_return_pct']),
-                'weight_formatted': f"{position_detail['weight_pct']:.1f}%"
+                'todays_pnl_dollars_formatted': format_currency(position_detail['todays_pnl_dollars']),
+                'total_pnl_dollars_formatted': format_currency(position_detail['total_pnl_dollars']),
+                'todays_pnl_percent_formatted': format_percentage(position_detail['todays_pnl_percent']),
+                'total_pnl_percent_formatted': format_percentage(position_detail['total_pnl_percent'])
             })
             
             position_details.append(position_detail)
@@ -292,8 +403,19 @@ def get_agent_detail(agent_id: str):
         # Sort positions by market value descending
         position_details.sort(key=lambda x: x['market_value'], reverse=True)
         
-        # Get latest performance metrics
-        latest_performance = performance_history[0] if performance_history else {}
+        # Calculate returns from real-time position data
+        total_todays_pnl = sum(pos.get('todays_pnl_dollars', 0) or 0 for pos in positions)
+        total_unrealized_pnl = sum(pos.get('total_pnl_dollars', 0) or 0 for pos in positions)
+        
+        # Calculate today's return
+        daily_return_pct = 0.0
+        if total_value != 0:
+            portfolio_value_yesterday = total_value - total_todays_pnl
+            if portfolio_value_yesterday != 0:
+                daily_return_pct = (total_todays_pnl / portfolio_value_yesterday) * 100
+        
+        # Calculate lifetime total return including realized profits
+        lifetime_total_return_pct = calculate_agent_lifetime_return(agent_id, total_unrealized_pnl)
         
         agent_detail = {
             'agent_id': agent_id,
@@ -304,8 +426,10 @@ def get_agent_detail(agent_id: str):
             'total_value': total_value,
             'total_value_formatted': format_currency(total_value),
             'position_count': len(position_details),
-            'daily_return_pct': latest_performance.get('daily_return_pct', 0.0) or 0.0,
-            'total_return_pct': latest_performance.get('total_return_pct', 0.0) or 0.0,
+            'daily_return_pct': daily_return_pct,
+            'total_return_pct': lifetime_total_return_pct,
+            'daily_return_formatted': format_percentage(daily_return_pct),
+            'total_return_formatted': format_percentage(lifetime_total_return_pct),
             'positions': position_details,
             'performance_history': performance_history[:7]  # Last 7 days
         }
@@ -325,14 +449,15 @@ def get_agent_detail(agent_id: str):
 
 @app.route('/api/agents/<agent_id>/positions', methods=['GET'])
 @handle_api_errors
-@cache_response(ttl_seconds=300)  # 5-minute cache for positions
+@cache_response(ttl_seconds=30)  # 30-second cache for real-time positions
 def get_agent_positions_api(agent_id: str):
     """Current positions for agent."""
     try:
-        positions = get_agent_positions(agent_id)
+        # Get real-time positions from Alpaca
+        positions = get_real_time_agent_positions(agent_id)
         
         # Filter for active positions only
-        active_positions = [pos for pos in positions if pos.get('quantity', 0) > 0]
+        active_positions = [pos for pos in positions if pos.get('quantity', 0) != 0]
         
         return jsonify({
             'agent_id': agent_id,

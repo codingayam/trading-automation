@@ -6,12 +6,16 @@ set -e  # Exit on any error
 
 # Configuration
 APP_NAME="trading-dashboard"
+INTRADAY_NAME="trading-intraday"
+SCHEDULER_NAME="trading-scheduler"
 APP_USER="tradingapp"
 APP_GROUP="tradingapp"
 APP_DIR="/opt/trading-automation"
 NGINX_CONFIG_PATH="/etc/nginx/sites-available/${APP_NAME}"
 NGINX_ENABLED_PATH="/etc/nginx/sites-enabled/${APP_NAME}"
-SYSTEMD_SERVICE_PATH="/etc/systemd/system/${APP_NAME}.service"
+SYSTEMD_DASHBOARD_PATH="/etc/systemd/system/${APP_NAME}.service"
+SYSTEMD_INTRADAY_PATH="/etc/systemd/system/${INTRADAY_NAME}.service"
+SYSTEMD_SCHEDULER_PATH="/etc/systemd/system/${SCHEDULER_NAME}.service"
 
 # Colors for output
 RED='\033[0;31m'
@@ -105,7 +109,7 @@ deploy_application() {
     fi
     
     # Copy files
-    cp -r src/ config/ requirements*.txt "$APP_DIR/"
+    cp -r src/ config/ requirements*.txt main.py "$APP_DIR/"
     cp -r deployment/ "$APP_DIR/"
     
     # Create Python virtual environment
@@ -152,6 +156,13 @@ LOG_PATH=logs
 QUIVER_API_KEY=your_quiver_api_key_here
 ALPACA_API_KEY=your_alpaca_api_key_here
 ALPACA_SECRET_KEY=your_alpaca_secret_key_here
+ALPACA_PAPER=true
+
+# Andy Grok Agent Configuration
+ANDY_GROK_ENABLED=true
+RSI_PERIOD=14
+RSI_OVERSOLD_THRESHOLD=30.0
+RSI_OVERBOUGHT_THRESHOLD=70.0
 
 # Security
 FLASK_SECRET_KEY=$(openssl rand -base64 32)
@@ -205,20 +216,32 @@ configure_nginx() {
     success "Nginx configured"
 }
 
-# Configure systemd service
+# Configure systemd services
 configure_systemd() {
-    log "Configuring systemd service..."
+    log "Configuring systemd services..."
     
-    # Copy and configure systemd service file
+    # Configure dashboard service
     sed -e "s|/path/to/trading-automation|$APP_DIR|g" \
         -e "s|User=tradingapp|User=$APP_USER|g" \
         -e "s|Group=tradingapp|Group=$APP_GROUP|g" \
-        "$APP_DIR/deployment/systemd/trading-dashboard.service" > "$SYSTEMD_SERVICE_PATH"
+        "$APP_DIR/deployment/systemd/trading-dashboard.service" > "$SYSTEMD_DASHBOARD_PATH"
+    
+    # Configure intraday scheduler service (Andy Grok Agent)
+    sed -e "s|/path/to/trading-automation|$APP_DIR|g" \
+        -e "s|User=tradingapp|User=$APP_USER|g" \
+        -e "s|Group=tradingapp|Group=$APP_GROUP|g" \
+        "$APP_DIR/deployment/systemd/trading-intraday.service" > "$SYSTEMD_INTRADAY_PATH"
+    
+    # Configure daily scheduler service (Congressional trades)
+    sed -e "s|/path/to/trading-automation|$APP_DIR|g" \
+        -e "s|User=tradingapp|User=$APP_USER|g" \
+        -e "s|Group=tradingapp|Group=$APP_GROUP|g" \
+        "$APP_DIR/deployment/systemd/trading-scheduler.service" > "$SYSTEMD_SCHEDULER_PATH"
     
     # Reload systemd
     systemctl daemon-reload
     
-    success "Systemd service configured"
+    success "Systemd services configured"
 }
 
 # Start services
@@ -228,6 +251,14 @@ start_services() {
     # Enable and start dashboard service
     systemctl enable "$APP_NAME"
     systemctl start "$APP_NAME"
+    
+    # Enable and start intraday scheduler (Andy Grok Agent)
+    systemctl enable "$INTRADAY_NAME"
+    systemctl start "$INTRADAY_NAME"
+    
+    # Enable and start daily scheduler (Congressional trades)
+    systemctl enable "$SCHEDULER_NAME"
+    systemctl start "$SCHEDULER_NAME"
     
     # Restart Nginx
     systemctl restart nginx
@@ -240,12 +271,30 @@ start_services() {
 verify_deployment() {
     log "Verifying deployment..."
     
-    # Check service status
+    # Check dashboard service status
     if systemctl is-active --quiet "$APP_NAME"; then
         success "Dashboard service is running"
     else
         error "Dashboard service is not running"
         systemctl status "$APP_NAME"
+        return 1
+    fi
+    
+    # Check intraday scheduler status
+    if systemctl is-active --quiet "$INTRADAY_NAME"; then
+        success "Intraday scheduler (Andy Grok) is running"
+    else
+        error "Intraday scheduler is not running"
+        systemctl status "$INTRADAY_NAME"
+        return 1
+    fi
+    
+    # Check daily scheduler status
+    if systemctl is-active --quiet "$SCHEDULER_NAME"; then
+        success "Daily scheduler is running"
+    else
+        error "Daily scheduler is not running"
+        systemctl status "$SCHEDULER_NAME"
         return 1
     fi
     
@@ -285,8 +334,12 @@ show_info() {
     echo ""
     echo "Useful Commands:"
     echo "  sudo systemctl status $APP_NAME"
+    echo "  sudo systemctl status $INTRADAY_NAME" 
+    echo "  sudo systemctl status $SCHEDULER_NAME"
     echo "  sudo systemctl restart $APP_NAME"
-    echo "  sudo systemctl logs -f $APP_NAME"
+    echo "  sudo systemctl restart $INTRADAY_NAME"
+    echo "  sudo systemctl restart $SCHEDULER_NAME" 
+    echo "  sudo journalctl -u $INTRADAY_NAME -f  # Follow Andy Grok logs"
     echo "  sudo nginx -t"
     echo "  sudo systemctl reload nginx"
     echo ""

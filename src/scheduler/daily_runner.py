@@ -76,8 +76,8 @@ class DailyRunner:
         self.agent_factory = agent_factory or globals()['agent_factory']
         
         # Configuration
-        self.execution_time = settings.agents.global_parameters.execution_time  # "21:30"
-        self.timezone = pytz.timezone(settings.agents.global_parameters.timezone)  # "US/Eastern"
+        self.execution_time = settings.scheduling.daily_execution_time  # "21:30"
+        self.timezone = pytz.timezone(settings.scheduling.timezone)  # "US/Eastern"
         
         # State management
         self.state = SchedulerState.STOPPED

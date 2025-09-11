@@ -45,9 +45,12 @@ class TestBaseAgent:
             politician=politician,
             ticker=ticker,
             transaction_date=date.today(),
-            transaction_type="Purchase",
-            amount=amount,
-            filing_date=date.today()
+            trade_type="Purchase",
+            amount_range="$50,001 - $100,000",
+            amount_min=amount,
+            amount_max=amount,
+            last_modified=date.today(),
+            raw_data={}
         )
     
     @patch('src.agents.base_agent.DatabaseManager')
@@ -70,21 +73,30 @@ class TestBaseAgent:
         """Test configuration validation."""
         # Missing required fields
         with pytest.raises(ValidationError):
+            class MockAgent(BaseAgent):
+                def _matches_tracked_politicians(self, trade: CongressionalTrade) -> bool:
+                    return True
             config = {'id': 'test'}
-            BaseAgent('test', config)
+            MockAgent('test', config)
         
         # Empty politicians list
         with pytest.raises(ValidationError):
+            class MockAgent(BaseAgent):
+                def _matches_tracked_politicians(self, trade: CongressionalTrade) -> bool:
+                    return True
             config = {
                 'id': 'test',
                 'name': 'Test',
                 'type': 'individual',
                 'politicians': []
             }
-            BaseAgent('test', config)
+            MockAgent('test', config)
         
         # Invalid parameter values
         with pytest.raises(ValidationError):
+            class MockAgent(BaseAgent):
+                def _matches_tracked_politicians(self, trade: CongressionalTrade) -> bool:
+                    return True
             config = {
                 'id': 'test',
                 'name': 'Test', 
@@ -94,7 +106,7 @@ class TestBaseAgent:
                     'match_threshold': 1.5  # Invalid threshold
                 }
             }
-            BaseAgent('test', config)
+            MockAgent('test', config)
     
     @patch('src.agents.base_agent.DatabaseManager')
     @patch('src.agents.base_agent.AlpacaClient')
@@ -115,13 +127,13 @@ class TestBaseAgent:
         assert "Test Politician" in decision.reason
         
         # Test non-matching trade (sale)
-        trade.transaction_type = "Sale"
+        trade.trade_type = "Sale"
         decision = agent._apply_copy_trading_strategy(trade)
         assert decision is None
         
         # Test trade below minimum value
-        trade.transaction_type = "Purchase"
-        trade.amount = 10000  # Below 50k minimum
+        trade.trade_type = "Purchase"
+        trade.amount_max = 10000  # Below 50k minimum
         decision = agent._apply_copy_trading_strategy(trade)
         assert decision is None
     

@@ -47,7 +47,9 @@ class APIError(TradingSystemError):
             'status_code': status_code,
             'response_data': response_data
         })
-        super().__init__(message, context=context, **kwargs)
+        # Filter kwargs to only include those accepted by TradingSystemError
+        filtered_kwargs = {k: v for k, v in kwargs.items() if k in ['error_code', 'context', 'cause']}
+        super().__init__(message, context=context, **filtered_kwargs)
         self.api_name = api_name
         self.status_code = status_code
         self.response_data = response_data
@@ -113,6 +115,10 @@ class SchedulingError(TradingSystemError):
     """Raised when scheduling operations fail."""
     pass
 
+class SchedulerError(SchedulingError):
+    """Alias for SchedulingError - raised when scheduler operations fail."""
+    pass
+
 class ValidationError(TradingSystemError):
     """Raised when data validation fails."""
     
@@ -130,10 +136,12 @@ class ValidationError(TradingSystemError):
 class RateLimitError(APIError):
     """Raised when API rate limits are exceeded."""
     
-    def __init__(self, message: str, retry_after: Optional[int] = None, **kwargs):
+    def __init__(self, message: str, api_name: str = "Unknown", retry_after: Optional[int] = None, **kwargs):
         context = kwargs.get('context', {})
         context.update({'retry_after': retry_after})
-        super().__init__(message, context=context, **kwargs)
+        # Filter out retry_after from kwargs before passing to parent
+        filtered_kwargs = {k: v for k, v in kwargs.items() if k != 'retry_after'}
+        super().__init__(message, api_name=api_name, context=context, **filtered_kwargs)
         self.retry_after = retry_after
 
 class InsufficientFundsError(TradingError):
@@ -174,6 +182,16 @@ class DataProcessingError(TradingSystemError):
         super().__init__(message, context=context, **kwargs)
         self.data_source = data_source
         self.processing_step = processing_step
+
+class DataValidationError(ValidationError):
+    """Raised when data validation fails specifically for API data."""
+    
+    def __init__(self, message: str, data_source: Optional[str] = None, 
+                 field: Optional[str] = None, value: Optional[Any] = None, **kwargs):
+        context = kwargs.get('context', {})
+        context.update({'data_source': data_source})
+        super().__init__(message, field=field, value=value, context=context, **kwargs)
+        self.data_source = data_source
 
 class RetryableError(TradingSystemError):
     """Base class for errors that should be retried."""

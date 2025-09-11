@@ -11,7 +11,9 @@ from typing import Optional
 
 from config.settings import settings
 from src.scheduler.daily_runner import daily_runner
+from src.scheduler.intraday_scheduler import intraday_scheduler
 from src.agents.agent_factory import agent_factory
+from src.agents.andy_grok_agent import AndyGrokAgent
 from src.data.data_processor import DataProcessor
 from src.utils.logging import get_logger
 from src.utils.health import health_server
@@ -185,6 +187,169 @@ def show_status():
         print(f"ERROR: {e}")
         sys.exit(1)
 
+def run_intraday_scheduler():
+    """Start the intraday scheduler for technical agents."""
+    logger.info("Starting intraday scheduler for technical trading agents...")
+    
+    try:
+        # Create and register technical agents
+        agents = agent_factory.create_agents_from_config()
+        
+        # Filter technical agents
+        technical_agents = [agent for agent in agents if isinstance(agent, AndyGrokAgent)]
+        
+        if not technical_agents:
+            logger.warning("No technical agents found in configuration")
+            print("No technical agents configured. Please add technical agents to config/agents.json")
+            sys.exit(1)
+        
+        # Add technical agents to intraday scheduler
+        for agent in technical_agents:
+            intraday_scheduler.add_technical_agent(agent)
+            logger.info(f"Added technical agent {agent.agent_id} to intraday scheduler")
+        
+        # Start health server
+        health_server.start()
+        logger.info("Health server started on port 8080")
+        
+        # Start intraday scheduler
+        intraday_scheduler.start()
+        logger.info(f"Intraday scheduler started with {len(technical_agents)} technical agents")
+        
+        print(f"\n🚀 Intraday scheduler started successfully!")
+        print(f"Technical agents: {', '.join([agent.agent_id for agent in technical_agents])}")
+        print(f"Health server: http://localhost:8080")
+        print(f"Press Ctrl+C to stop...\n")
+        
+        # Keep the main thread alive
+        try:
+            while True:
+                time.sleep(60)
+                
+                # Check scheduler health
+                status = intraday_scheduler.get_status()
+                if not status['running']:
+                    logger.error("Intraday scheduler stopped running")
+                    break
+        
+        except KeyboardInterrupt:
+            logger.info("Received interrupt signal")
+        
+        finally:
+            # Graceful shutdown
+            logger.info("Shutting down intraday scheduler...")
+            intraday_scheduler.stop()
+            health_server.stop()
+            logger.info("Intraday scheduler stopped")
+    
+    except Exception as e:
+        logger.error(f"Intraday scheduler failed: {e}", exc_info=True)
+        print(f"ERROR: {e}")
+        sys.exit(1)
+
+def run_andy_grok_once():
+    """Run Andy Grok agent once for testing."""
+    logger.info("Running Andy Grok agent once...")
+    
+    try:
+        # Create Andy Grok agent from config
+        agents = agent_factory.create_agents_from_config()
+        andy_grok_agents = [agent for agent in agents if isinstance(agent, AndyGrokAgent)]
+        
+        if not andy_grok_agents:
+            logger.error("No Andy Grok agent found in configuration")
+            print("Andy Grok agent not found. Please check config/agents.json")
+            sys.exit(1)
+        
+        agent = andy_grok_agents[0]
+        
+        print(f"\n🤖 Running {agent.agent_id} ({agent.config.get('name', 'Unknown')})...")
+        print(f"Target ticker: {agent.target_ticker}")
+        print(f"RSI thresholds: oversold < {agent.rsi_oversold_threshold}, overbought > {agent.rsi_overbought_threshold}")
+        
+        # Execute intraday workflow
+        start_time = datetime.now()
+        result = agent.execute_intraday_workflow()
+        duration = (datetime.now() - start_time).total_seconds()
+        
+        print(f"\n📊 Execution Results:")
+        print(f"Success: {'✓' if result.success else '✗'}")
+        print(f"Duration: {duration:.2f}s")
+        print(f"Trades processed: {result.trades_processed}")
+        print(f"Orders placed: {result.orders_placed}")
+        
+        if result.errors:
+            print(f"Errors: {len(result.errors)}")
+            for error in result.errors:
+                print(f"  - {error}")
+        
+        # Show strategy status
+        status = agent.get_strategy_status()
+        print(f"\n📈 Strategy Status:")
+        print(f"Account equity: ${status['account_equity']:.2f}")
+        print(f"Daily trades: {status['daily_trade_count']}")
+        print(f"Last RSI: {status['last_rsi_value']:.2f}" if status['last_rsi_value'] else "Last RSI: Not calculated")
+        print(f"Market open: {'Yes' if status['market_status']['is_open'] else 'No'}")
+        print(f"Should close positions: {'Yes' if status['market_status']['should_close_positions'] else 'No'}")
+        
+        sys.exit(0 if result.success else 1)
+    
+    except Exception as e:
+        logger.error(f"Andy Grok execution failed: {e}", exc_info=True)
+        print(f"ERROR: {e}")
+        sys.exit(1)
+
+def show_intraday_status():
+    """Show intraday scheduler status."""
+    logger.info("Getting intraday scheduler status...")
+    
+    try:
+        status = intraday_scheduler.get_status()
+        
+        print(f"\n{'='*60}")
+        print("INTRADAY SCHEDULER STATUS")
+        print(f"{'='*60}")
+        
+        # Scheduler info
+        print(f"Running: {'Yes' if status['running'] else 'No'}")
+        print(f"Total tasks: {status['total_tasks']}")
+        print(f"Active tasks: {status['active_tasks']}")
+        
+        # Statistics
+        stats = status['statistics']
+        print(f"\nExecution Statistics:")
+        print(f"  Total executions: {stats['total_executions']}")
+        print(f"  Successful: {stats['successful_executions']}")
+        print(f"  Failed: {stats['failed_executions']}")
+        print(f"  Success rate: {stats['success_rate']:.1f}%")
+        print(f"  Uptime: {stats['uptime_seconds']:.0f}s")
+        
+        if stats['last_execution_time']:
+            print(f"  Last execution: {stats['last_execution_time']}")
+        
+        # Task details
+        print(f"\nTasks:")
+        for task_id, task_info in status['tasks'].items():
+            status_icon = "✓" if task_info['enabled'] else "✗"
+            print(f"  {status_icon} {task_id} ({task_info['schedule_type']}) at {task_info['execution_time']}")
+            print(f"    Agent: {task_info['agent_id']}")
+            print(f"    Executions: {task_info['execution_count']}, Errors: {task_info['error_count']}")
+            if task_info['last_execution']:
+                print(f"    Last run: {task_info['last_execution']}")
+        
+        # Market status
+        market = status['market_status']
+        print(f"\nMarket Status:")
+        print(f"  Is market day: {'Yes' if market['is_market_day'] else 'No'}")
+        print(f"  Timezone: {market['timezone']}")
+        
+        print(f"{'='*60}\n")
+    
+    except Exception as e:
+        logger.error(f"Intraday status check failed: {e}")
+        print(f"ERROR: {e}")
+        sys.exit(1)
+
 def list_agents():
     """List all configured agents."""
     logger.info("Listing agents...")
@@ -255,6 +420,15 @@ Examples:
     # List agents command
     subparsers.add_parser('list-agents', help='List configured agents')
     
+    # Intraday scheduler command
+    subparsers.add_parser('intraday', help='Start intraday scheduler for technical agents')
+    
+    # Andy Grok run once command
+    subparsers.add_parser('andy-grok-once', help='Run Andy Grok agent once for testing')
+    
+    # Intraday status command
+    subparsers.add_parser('intraday-status', help='Show intraday scheduler status')
+    
     args = parser.parse_args()
     
     if not args.command:
@@ -275,6 +449,12 @@ Examples:
             show_status()
         elif args.command == 'list-agents':
             list_agents()
+        elif args.command == 'intraday':
+            run_intraday_scheduler()
+        elif args.command == 'andy-grok-once':
+            run_andy_grok_once()
+        elif args.command == 'intraday-status':
+            show_intraday_status()
         else:
             parser.print_help()
             sys.exit(1)

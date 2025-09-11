@@ -289,13 +289,37 @@ class BaseAgent(ABC):
                 logger.error(f"Invalid ticker: {trade_decision.ticker}")
                 return False
             
-            # Place order
-            order_info = self.alpaca_client.place_market_order(
-                ticker=trade_decision.ticker,
-                side=trade_decision.side,
-                notional=trade_decision.amount,
-                time_in_force='gtc'
-            )
+            # For short sells, convert to whole shares (fractional shorts not allowed)
+            if trade_decision.side == 'sell' and 'short' in trade_decision.reason.lower():
+                # Get current price and convert to shares
+                current_price = self.market_data_service.get_current_price(trade_decision.ticker)
+                if not current_price:
+                    logger.error(f"Could not get current price for {trade_decision.ticker}")
+                    return False
+                
+                # Calculate whole shares (round down to avoid insufficient funds)
+                shares = int(trade_decision.amount / current_price)
+                if shares <= 0:
+                    logger.warning(f"Position size too small for whole shares: ${trade_decision.amount:.2f} / ${current_price:.2f} = {shares}")
+                    return False
+                
+                logger.info(f"Converting short order to {shares} shares (${shares * current_price:.2f})")
+                order_info = self.alpaca_client.place_market_order(
+                    ticker=trade_decision.ticker,
+                    side=trade_decision.side,
+                    quantity=shares,
+                    time_in_force='day'  # Short orders use DAY
+                )
+            else:
+                # Regular buy orders can use fractional amounts
+                time_in_force = 'day' if trade_decision.amount < 1000 else 'gtc'
+                order_info = self.alpaca_client.place_market_order(
+                    ticker=trade_decision.ticker,
+                    side=trade_decision.side,
+                    notional=trade_decision.amount,
+                    time_in_force=time_in_force
+                )
+            
             
             if order_info:
                 # Log trade execution
@@ -372,7 +396,7 @@ class BaseAgent(ABC):
         FROM trades 
         WHERE agent_id = ? AND order_status IN ('filled', 'partially_filled')
         GROUP BY ticker
-        HAVING total_quantity > 0
+        HAVING total_quantity != 0
         """
         
         result = self.db.execute_query(query, (self.agent_id,))
@@ -400,7 +424,7 @@ class BaseAgent(ABC):
             # Find current price from Alpaca positions
             alpaca_position = next((pos for pos in alpaca_positions if pos.ticker == ticker), None)
             
-            if alpaca_position and agent_quantity > 0:
+            if alpaca_position and agent_quantity != 0:
                 current_price = float(alpaca_position.current_price)
                 market_value = agent_quantity * current_price
                 unrealized_pnl = (current_price - agent_avg_cost) * agent_quantity
@@ -476,14 +500,67 @@ class BaseAgent(ABC):
             raise TradingError(f"Performance calculation failed: {e}", agent_id=self.agent_id)
     
     def _get_current_portfolio_value(self) -> float:
-        """Get current portfolio value."""
-        query = "SELECT SUM(market_value) FROM agent_positions WHERE agent_id = ?"
+        """Get current portfolio value using database positions with real-time prices."""
+        try:
+            # First update positions to ensure we have current prices
+            self._update_positions_with_current_prices()
+            
+            # Then get total value from database
+            query = "SELECT SUM(market_value) FROM agent_positions WHERE agent_id = ?"
+            result = self.db.execute_query(query, (self.agent_id,))
+            return float(result[0][0] or 0.0) if result else 0.0
+            
+        except Exception as e:
+            logger.warning(f"Could not get current portfolio value: {e}")
+            return 0.0
+    
+    def _update_positions_with_current_prices(self) -> None:
+        """Update agent positions in database with current market prices."""
+        try:
+            # Get agent's current positions from database
+            query = """
+            SELECT ticker, quantity, avg_cost 
+            FROM agent_positions 
+            WHERE agent_id = ? AND quantity != 0
+            """
+            result = self.db.execute_query(query, (self.agent_id,))
+            
+            if not result:
+                return
+            
+            # Get current Alpaca positions for price lookup
+            alpaca_positions = self.alpaca_client.get_all_positions()
+            alpaca_price_map = {pos.ticker: float(pos.current_price) for pos in alpaca_positions}
+            
+            # Update each position with current price
+            for row in result:
+                ticker, quantity, avg_cost = row[0], float(row[1]), float(row[2])
+                
+                if ticker in alpaca_price_map:
+                    current_price = alpaca_price_map[ticker]
+                    market_value = quantity * current_price
+                    unrealized_pnl = (current_price - avg_cost) * quantity
+                    
+                    # Update position in database
+                    update_query = """
+                    UPDATE agent_positions 
+                    SET current_price = ?, market_value = ?, unrealized_pnl = ?, last_updated = CURRENT_TIMESTAMP
+                    WHERE agent_id = ? AND ticker = ?
+                    """
+                    self.db.execute_modify(update_query, (current_price, market_value, unrealized_pnl, self.agent_id, ticker))
+            
+        except Exception as e:
+            logger.warning(f"Could not update positions with current prices: {e}")
+    
+    def _get_agent_tickers(self) -> List[str]:
+        """Get list of tickers this agent has traded."""
+        query = "SELECT DISTINCT ticker FROM trades WHERE agent_id = ?"
         result = self.db.execute_query(query, (self.agent_id,))
-        return float(result[0][0] or 0.0) if result else 0.0
+        return [row[0] for row in result] if result else []
     
     def _get_position_count(self) -> int:
-        """Get number of positions."""
-        query = "SELECT COUNT(*) FROM agent_positions WHERE agent_id = ? AND quantity > 0"
+        """Get number of positions from agent_positions table."""
+        query = "SELECT COUNT(*) FROM agent_positions WHERE agent_id = ? AND quantity != 0"
         result = self.db.execute_query(query, (self.agent_id,))
         return int(result[0][0] or 0) if result else 0
     

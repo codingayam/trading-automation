@@ -511,22 +511,31 @@ def get_all_agent_summaries() -> List[Dict[str, Any]]:
     """Get summary data for all agents."""
     db = DatabaseManager()
     
+    # Get all agents from daily_performance table (which includes agents with $0 positions)
     query = """
     SELECT 
-        ap.agent_id,
-        COUNT(ap.ticker) as position_count,
-        SUM(ap.market_value) as total_value,
+        dp.agent_id,
+        COALESCE(COUNT(ap.ticker), 0) as position_count,
+        COALESCE(SUM(ap.market_value), 0.0) as total_value,
         dp.daily_return_pct,
         dp.total_return_pct
-    FROM agent_positions ap
-    LEFT JOIN daily_performance dp ON ap.agent_id = dp.agent_id 
-        AND dp.date = (SELECT MAX(date) FROM daily_performance WHERE agent_id = ap.agent_id)
-    WHERE ap.quantity > 0
-    GROUP BY ap.agent_id
+    FROM daily_performance dp
+    LEFT JOIN agent_positions ap ON dp.agent_id = ap.agent_id AND ap.quantity != 0
+    WHERE dp.date = (SELECT MAX(date) FROM daily_performance WHERE agent_id = dp.agent_id)
+    GROUP BY dp.agent_id
     """
     
     rows = db.execute_query(query)
-    return [dict(row) for row in rows]
+    summaries = []
+    for row in rows:
+        summaries.append({
+            'agent_id': row[0],
+            'position_count': row[1],
+            'total_value': row[2],
+            'daily_return_pct': row[3],
+            'total_return_pct': row[4]
+        })
+    return summaries
 
 # Global database instance
 db = DatabaseManager()

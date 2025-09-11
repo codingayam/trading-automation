@@ -14,6 +14,8 @@ from config.settings import settings
 from src.agents.base_agent import BaseAgent, AgentState, ExecutionResult
 from src.agents.individual_agent import IndividualAgent, JoshGottheimerAgent, SheldonWhitehouseAgent, NancyPelosiAgent, DanMeuserAgent
 from src.agents.committee_agent import CommitteeAgent, TransportationCommitteeAgent
+from src.agents.technical_agent import TechnicalAgent
+from src.agents.andy_grok_agent import AndyGrokAgent
 from src.data.quiver_client import CongressionalTrade
 from src.utils.logging import get_logger
 from src.utils.exceptions import TradingError, ValidationError
@@ -26,6 +28,7 @@ class AgentType(Enum):
     """Available agent types."""
     INDIVIDUAL = "individual"
     COMMITTEE = "committee"
+    TECHNICAL = "technical"
 
 @dataclass
 class AgentRegistration:
@@ -87,6 +90,8 @@ class AgentFactory:
         self._agent_types.update({
             'individual': IndividualAgent,
             'committee': CommitteeAgent,
+            'technical': TechnicalAgent,
+            'andy_grok': AndyGrokAgent,
             'josh_gottheimer': JoshGottheimerAgent,
             'sheldon_whitehouse': SheldonWhitehouseAgent,
             'nancy_pelosi': NancyPelosiAgent,
@@ -178,17 +183,19 @@ class AgentFactory:
         Args:
             config: Agent configuration to validate
         """
-        required_fields = ['id', 'name', 'type', 'politicians']
+        required_fields = ['id', 'name', 'type']
         
         for field in required_fields:
             if field not in config:
                 raise ValidationError(f"Missing required field: {field}")
         
-        if not config['politicians']:
-            raise ValidationError("Agent must track at least one politician")
+        # Non-technical agents require politicians
+        if config.get('type') != 'technical':
+            if 'politicians' not in config or not config['politicians']:
+                raise ValidationError("Non-technical agents must track at least one politician")
         
         # Validate agent type
-        valid_types = ['individual', 'committee']
+        valid_types = ['individual', 'committee', 'technical']
         if config['type'] not in valid_types:
             raise ValidationError(f"Invalid agent type: {config['type']}")
         
