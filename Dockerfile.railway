@@ -6,9 +6,9 @@ ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV ENVIRONMENT=production
 
-# Create app user
-RUN groupadd --system tradingapp || true && \
-    useradd --system --gid tradingapp --home-dir /app tradingapp
+# Create app user (handle existing group gracefully)
+RUN groupadd --system tradingapp 2>/dev/null || true
+RUN useradd --system --gid tradingapp --home-dir /app --create-home tradingapp 2>/dev/null || true
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
