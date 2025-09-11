@@ -276,17 +276,38 @@ def system_status():
 def get_agents():
     """List all agents with performance summary."""
     try:
-        # Get agent summaries from database
-        agent_summaries = get_all_agent_summaries()
+        # Get all agents from agents table (for initial display)
+        query = """
+        SELECT id, name, type, description, politicians, enabled, parameters
+        FROM agents 
+        WHERE enabled = 1
+        ORDER BY name
+        """
         
-        # Enhance with agent configuration and current market data
+        rows = db.execute_query(query)
         agents_data = []
-        agent_configs = settings.get_enabled_agents()
         
-        for summary in agent_summaries:
-            agent_id = summary['agent_id']
+        for row in rows:
+            agent_id = row[0]
+            
+            # Get any existing performance data
+            perf_query = """
+            SELECT 
+                COALESCE(COUNT(ap.ticker), 0) as position_count,
+                COALESCE(SUM(ap.market_value), 0.0) as total_value,
+                COALESCE(dp.daily_return_pct, 0.0) as daily_return_pct,
+                COALESCE(dp.total_return_pct, 0.0) as total_return_pct
+            FROM (SELECT ? as agent_id) base
+            LEFT JOIN agent_positions ap ON base.agent_id = ap.agent_id AND ap.quantity != 0
+            LEFT JOIN daily_performance dp ON base.agent_id = dp.agent_id 
+                AND dp.date = (SELECT MAX(date) FROM daily_performance WHERE agent_id = base.agent_id)
+            """
+            
+            perf_rows = db.execute_query(perf_query, (agent_id,))
+            perf_data = perf_rows[0] if perf_rows else (0, 0.0, 0.0, 0.0)
             
             # Find matching agent configuration
+            agent_configs = settings.get_enabled_agents()
             agent_config = next(
                 (config for config in agent_configs if config['id'] == agent_id),
                 None
