@@ -48,5 +48,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 # Expose port (Railway will set this)
 EXPOSE $PORT
 
-# Command to run both services via supervisor
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+# Command to run debug script first to diagnose issues
+CMD ["python3", "railway_debug.py"]
