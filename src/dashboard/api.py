@@ -224,6 +224,15 @@ def health_check():
     })
 
 
+@app.route('/health', methods=['GET'])
+def simple_health_check():
+    """Simple health check endpoint for Railway."""
+    return jsonify({
+        'status': 'healthy',
+        'timestamp': datetime.now().isoformat()
+    })
+
+
 @app.route('/api/system/status', methods=['GET'])
 @handle_api_errors
 @cache_response(ttl_seconds=60)  # 1-minute cache for system status
