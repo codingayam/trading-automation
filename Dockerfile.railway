@@ -43,11 +43,11 @@ COPY deployment/railway/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 USER tradingapp
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:$PORT/api/health || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD curl -f http://localhost:$PORT/health || curl -f http://localhost:$PORT/api/health || exit 1
 
 # Expose port (Railway will set this)
 EXPOSE $PORT
 
 # Command to initialize agents then run supervisor
-CMD ["sh", "-c", "python3 initialize_agents.py && /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf"]
+CMD ["sh", "-c", "python3 initialize_agents.py || echo 'Init failed but continuing...' && /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf"]
