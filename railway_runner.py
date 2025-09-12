@@ -58,7 +58,7 @@ class RailwayRunner:
         logger.info("Dashboard thread started")
         
     def start_scheduler(self):
-        """Start the scheduler in a separate thread (optional)"""
+        """Start the scheduler in a separate NON-DAEMON thread to keep process alive"""
         def run_scheduler():
             try:
                 # Only start scheduler if all required env vars are present
@@ -71,20 +71,71 @@ class RailwayRunner:
                     
                 logger.info("Starting trading scheduler...")
                 
-                # Import and run scheduler
-                from main import main as run_main
-                sys.argv = ['main.py', 'start']
-                run_main()
+                # Force logs to STDOUT for Railway visibility
+                import logging
+                logging.basicConfig(
+                    level=logging.INFO,
+                    format="%(asctime)s %(levelname)s [%(process)d:%(threadName)s] %(name)s: %(message)s",
+                    handlers=[logging.StreamHandler(sys.stdout)],
+                    force=True
+                )
+                
+                # Add startup breadcrumbs
+                import tzlocal
+                from datetime import datetime
+                logger.info(f"Process PID={os.getpid()} tz={tzlocal.get_localzone_name()} now_local={datetime.now().astimezone()}")
+                
+                # Import and run scheduler - but keep the thread alive!
+                from src.scheduler.intraday_scheduler import IntradayScheduler
+                from src.agents.agent_factory import AgentFactory
+                from src.data.database import initialize_database
+                
+                # Initialize components
+                initialize_database()
+                agent_factory = AgentFactory()
+                agents = agent_factory.create_all_agents()
+                scheduler = IntradayScheduler()
+                
+                # Add all agents to scheduler
+                for agent in agents:
+                    if hasattr(agent, 'agent_type') and agent.agent_type == 'technical':
+                        scheduler.add_technical_agent(agent)
+                    else:
+                        scheduler.add_congressional_agent(agent)
+                
+                logger.info(f"Tasks loaded: {list(scheduler.tasks.keys())}")
+                logger.info(f"Current ET time: {datetime.now(scheduler.market_tz)}")
+                
+                # Start scheduler and keep running (non-daemon behavior)
+                scheduler.start()
+                
+                # CRITICAL: Run catch-up reconciliation immediately for late starts
+                logger.info("Running startup reconciliation for missed executions...")
+                missed_count = 0
+                for task in scheduler.tasks.values():
+                    if task.enabled and scheduler._should_fire_now(task):
+                        logger.info(f"Catch-up firing task: {task.task_id}")
+                        scheduler._execute_task(task)
+                        missed_count += 1
+                logger.info(f"Startup reconciliation complete: {missed_count} tasks fired")
+                
+                # Keep this thread alive with a heartbeat loop
+                import time
+                while not self.shutdown_event.is_set():
+                    time.sleep(60)
+                    if int(time.time()) % 300 == 0:  # Every 5 minutes
+                        logger.info(f"Scheduler heartbeat: {len(scheduler.tasks)} tasks active")
                 
             except Exception as e:
-                logger.error(f"Scheduler failed: {e}")
-                # Don't shutdown on scheduler failure - dashboard can still work
+                logger.exception(f"Scheduler failed with exception: {e}")
+                self.shutdown_event.set()
                 
-        # Only start scheduler thread if environment variables are available
+        # Only start scheduler thread if environment variables are available  
         if os.getenv('ALPACA_API_KEY') and os.getenv('QUIVER_API_KEY'):
-            self.scheduler_thread = threading.Thread(target=run_scheduler, daemon=True)
+            # NON-DAEMON thread so process stays alive!
+            self.scheduler_thread = threading.Thread(target=run_scheduler, daemon=False, name="TradingScheduler")
             self.scheduler_thread.start()
-            logger.info("Scheduler thread started")
+            logger.info("NON-DAEMON scheduler thread started - process will stay alive")
         else:
             logger.info("Scheduler not started - missing API credentials")
         
