@@ -383,7 +383,8 @@ def initialize_database():
         
     except Exception as e:
         logger.error("Database initialization failed", exception=e)
-        return False
+        # Re-raise exception so initialize_agents.py can catch and display it
+        raise e
 
 def insert_trade(agent_id: str, ticker: str, trade_data: Dict[str, Any]) -> int:
     """Insert a new trade record."""
