@@ -13,11 +13,9 @@ Deploy your trading automation system to Railway with a simplified all-in-one se
 6. Choose the **main** branch
 7. Railway will automatically detect `Dockerfile.railway` and start building
 
-### 2. Add PostgreSQL Database
-In your Railway project dashboard:
-1. Click **"New Service"**
-2. Select **"Database"** → **"PostgreSQL"**
-3. Railway automatically sets the `DATABASE_URL` environment variable
+### 2. Database Configuration
+The system uses SQLite database with persistent file storage.
+No additional database service required - SQLite files are stored on the Railway volume.
 
 ### 3. Set Environment Variables
 In Railway dashboard → your app service → **Variables** tab:
@@ -34,7 +32,6 @@ QUIVER_API_KEY=your_quiver_key_here
 **Optional:**
 ```
 LOG_LEVEL=INFO
-DAILY_EXECUTION_TIME=21:30
 ```
 
 ### 4. Automatic Deployment
@@ -50,10 +47,10 @@ That's it! Your trading automation system is now deployed and running in the clo
 
 The simplified Railway deployment includes:
 
-### ✅ Scheduler Service
-- Runs `python main.py scheduler`
-- Executes daily at 9:30 PM EST
-- Automatically handles agent execution
+### ✅ Unified Scheduler Service
+- Runs `python main.py start`
+- Executes ALL agents together during market hours (9:30 AM ET)
+- Congressional and technical agents in single process
 
 ### ✅ Dashboard Service  
 - Runs Flask web interface
@@ -67,31 +64,29 @@ The simplified Railway deployment includes:
 
 ## Database Configuration
 
-### PostgreSQL (Recommended)
-Railway automatically provides PostgreSQL with these benefits:
-- **Managed service** - no maintenance required
-- **Automatic backups** - built-in backup system
-- **Scalable** - can grow with your needs
-- **$5/month** - cost-effective for production
-
-The `DATABASE_URL` is automatically configured by Railway.
+### SQLite with Persistent Storage
+The system uses SQLite database stored on Railway volume:
+- **File-based** - no separate database service needed
+- **Persistent** - data survives deployments
+- **Zero cost** - included with app service
+- **Automatic** - no configuration required
 
 ## Service Architecture
 
 ```
 Railway Service (Single Container)
 ├── Supervisor (Process Manager)
-│   ├── Scheduler Process (main.py scheduler)
+│   ├── Unified Scheduler Process (main.py start)
 │   └── Dashboard Process (Flask app)
-├── PostgreSQL Database (Railway managed)
+├── SQLite Database (file storage)
 └── Health Check Endpoint
 ```
 
 ## Cost Estimate
 
 - **App Service**: ~$5/month (minimal usage)
-- **PostgreSQL**: $5/month
-- **Total**: ~$10/month
+- **Database**: $0 (SQLite included)
+- **Total**: ~$5/month
 
 ## Monitoring & Logs
 
@@ -114,13 +109,12 @@ Your dashboard will be available at:
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `ENVIRONMENT` | Yes | `production` | Environment mode |
-| `DATABASE_URL` | Auto | - | PostgreSQL connection (auto-set) |
+| `DATABASE_PATH` | Auto | `data/trading_automation.db` | SQLite database file path |
 | `ALPACA_API_KEY` | Yes | - | Alpaca trading API key |
 | `ALPACA_SECRET_KEY` | Yes | - | Alpaca trading secret |
 | `ALPACA_PAPER` | No | `true` | Use paper trading |
 | `QUIVER_API_KEY` | Yes | - | Quiver congressional data API |
 | `LOG_LEVEL` | No | `INFO` | Logging level |
-| `DAILY_EXECUTION_TIME` | No | `21:30` | Daily execution time (EST) |
 
 ## Troubleshooting
 
@@ -201,4 +195,4 @@ After deployment:
 
 🎯 **Your trading automation system is now running in the cloud!** 
 
-The system will execute daily at 9:30 PM EST and you can monitor everything through the web dashboard.
+The system will execute all agents together during market hours (9:30 AM ET) and you can monitor everything through the web dashboard.

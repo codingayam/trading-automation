@@ -1,5 +1,5 @@
 [Unit]
-Description=Trading Automation Daily Scheduler (Congressional Trades) - [DEPRECATED - Use trading-unified.service]
+Description=Trading Automation Unified Scheduler (All Agents - Market Hours)
 After=network.target
 Wants=network.target
 
@@ -13,8 +13,8 @@ WorkingDirectory=/path/to/trading-automation
 Environment=PYTHONPATH=/path/to/trading-automation
 EnvironmentFile=/path/to/trading-automation/.env
 
-# Command to run - Daily scheduler for congressional trades
-ExecStart=/path/to/trading-automation/venv/bin/python main.py scheduler
+# Command to run - Unified scheduler for all agents during market hours
+ExecStart=/path/to/trading-automation/venv/bin/python main.py start
 
 # Restart policy
 Restart=always
@@ -44,7 +44,7 @@ LimitNPROC=4096
 # Logging
 StandardOutput=journal
 StandardError=journal
-SyslogIdentifier=trading-scheduler
+SyslogIdentifier=trading-unified
 
 [Install]
 WantedBy=multi-user.target

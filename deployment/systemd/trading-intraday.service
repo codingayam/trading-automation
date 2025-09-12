@@ -1,5 +1,5 @@
 [Unit]
-Description=Trading Automation Intraday Scheduler (Andy Grok Agent)
+Description=Trading Automation Intraday Scheduler (Andy Grok Agent) - [DEPRECATED - Use trading-unified.service]
 After=network.target
 Wants=network.target
 

@@ -134,7 +134,36 @@ class IntradayScheduler:
         
         logger.info(f"Added technical agent {agent.agent_id} to intraday scheduler")
     
-    def add_task(self, task_id: str, agent: TechnicalAgent, schedule_type: ScheduleType,
+    def add_congressional_agent(self, agent, schedule_config: Dict[str, Any] = None) -> None:
+        """
+        Add a congressional agent for market hours execution.
+        
+        Args:
+            agent: Congressional agent to schedule (IndividualAgent or CommitteeAgent)
+            schedule_config: Custom schedule configuration
+        """
+        default_config = {
+            'market_open_enabled': True,
+            'market_close_enabled': False,  # Congressional agents only execute at market open
+            'market_open_time': '09:30'
+        }
+        
+        config = {**default_config, **(schedule_config or {})}
+        
+        # Add market open task for congressional agent
+        if config['market_open_enabled']:
+            open_task_id = f"{agent.agent_id}_market_open"
+            self.add_task(
+                task_id=open_task_id,
+                agent=agent,
+                schedule_type=ScheduleType.MARKET_OPEN,
+                execution_time=config['market_open_time'],
+                callback=self._execute_congressional_workflow
+            )
+        
+        logger.info(f"Added congressional agent {agent.agent_id} to market hours scheduler")
+    
+    def add_task(self, task_id: str, agent, schedule_type: ScheduleType,
                  execution_time: str, callback: Callable, enabled: bool = True) -> None:
         """
         Add an intraday task.
@@ -324,6 +353,28 @@ class IntradayScheduler:
         
         except Exception as e:
             logger.error(f"Closing workflow failed for {agent.agent_id}: {e}")
+            return False
+    
+    def _execute_congressional_workflow(self, agent) -> bool:
+        """Execute congressional agent workflow at market open."""
+        try:
+            logger.info(f"Executing congressional workflow for {agent.agent_id}")
+            
+            # Import daily runner to execute standard congressional workflow
+            from src.scheduler.daily_runner import daily_runner
+            
+            # Execute the agent through the standard workflow
+            result = agent.execute_workflow()
+            
+            if result.success:
+                logger.info(f"Congressional workflow completed for {agent.agent_id}: {result.trades_processed} trades, {result.orders_placed} orders")
+                return True
+            else:
+                logger.error(f"Congressional workflow failed for {agent.agent_id}: {len(result.errors)} errors")
+                return False
+        
+        except Exception as e:
+            logger.error(f"Congressional workflow failed for {agent.agent_id}: {e}")
             return False
     
     def _is_market_day(self) -> bool:

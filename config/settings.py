@@ -128,7 +128,7 @@ class Settings:
     def _load_scheduling_config(self) -> SchedulingConfig:
         """Load scheduling configuration."""
         return SchedulingConfig(
-            daily_execution_time=os.getenv('DAILY_EXECUTION_TIME', '21:30'),
+            daily_execution_time=os.getenv('DAILY_EXECUTION_TIME', '21:30'),  # DEPRECATED: Use 'start' command for market hours execution
             timezone=os.getenv('TIMEZONE', 'US/Eastern'),
             market_hours_start=os.getenv('MARKET_HOURS_START', '09:30'),
             market_hours_end=os.getenv('MARKET_HOURS_END', '16:00')

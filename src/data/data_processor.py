@@ -45,7 +45,7 @@ class DataProcessor:
     Unified data processing engine that orchestrates all API integrations.
     
     Features:
-    - Daily data fetching workflow (9:30 PM EST trigger)
+    - Data fetching workflow (scheduled or manual trigger)
     - Data validation and consistency checks across APIs
     - Transaction processing pipeline (fetch → filter → validate → store)
     - Portfolio synchronization between Alpaca and database

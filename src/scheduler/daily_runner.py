@@ -1,6 +1,7 @@
 """
-Daily Execution Scheduler for Trading Automation System.
-Orchestrates daily execution of all trading agents at 9:30 PM EST.
+Daily Execution Scheduler for Trading Automation System (DEPRECATED).
+DEPRECATED: Use market hours execution (main.py start) for unified agent scheduling.
+Legacy: Orchestrates congressional agents only at 9:30 PM EST.
 """
 import time
 import schedule
@@ -50,11 +51,13 @@ class ExecutionSummary:
 
 class DailyRunner:
     """
-    Daily execution scheduler that orchestrates the complete trading workflow.
+    Daily execution scheduler that orchestrates congressional agents only.
+    
+    DEPRECATED: Use market hours execution (main.py start) for all agents.
     
     Features:
-    - 9:30 PM EST scheduling with timezone handling
-    - Complete execution workflow orchestration
+    - 9:30 PM EST scheduling with timezone handling (legacy)
+    - Congressional agent workflow orchestration
     - Execution failure and partial completion handling
     - Execution logging and monitoring
     - Manual execution triggers for testing
@@ -76,7 +79,7 @@ class DailyRunner:
         self.agent_factory = agent_factory or globals()['agent_factory']
         
         # Configuration
-        self.execution_time = settings.scheduling.daily_execution_time  # "21:30"
+        self.execution_time = settings.scheduling.daily_execution_time  # DEPRECATED: "21:30" - legacy congressional schedule
         self.timezone = pytz.timezone(settings.scheduling.timezone)  # "US/Eastern"
         
         # State management

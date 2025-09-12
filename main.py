@@ -386,6 +386,75 @@ def list_agents():
         print(f"ERROR: {e}")
         sys.exit(1)
 
+def run_all_schedulers():
+    """Start all agents together during market hours."""
+    logger.info("Starting all trading agents for market hours execution...")
+    
+    try:
+        # Start health server
+        health_server.start()
+        logger.info("Health server started on port 8080")
+        
+        # Create and register ALL agents for market hours execution
+        agents = agent_factory.create_agents_from_config()
+        technical_agents = [agent for agent in agents if isinstance(agent, AndyGrokAgent)]
+        congressional_agents = [agent for agent in agents if not isinstance(agent, AndyGrokAgent)]
+        
+        if not agents:
+            logger.warning("No agents found in configuration")
+            print("No agents configured. Please add agents to config/agents.json")
+            sys.exit(1)
+        
+        # Add ALL agents to intraday scheduler for market hours execution
+        for agent in agents:
+            if isinstance(agent, AndyGrokAgent):
+                # Technical agents get their full intraday workflow
+                intraday_scheduler.add_technical_agent(agent)
+                logger.info(f"Added technical agent {agent.agent_id} to market hours scheduler")
+            else:
+                # Congressional agents get morning-only execution
+                intraday_scheduler.add_congressional_agent(agent)
+                logger.info(f"Added congressional agent {agent.agent_id} to market hours scheduler")
+        
+        # Start market hours scheduler
+        intraday_scheduler.start()
+        logger.info(f"Market hours scheduler started with {len(agents)} total agents")
+        
+        print(f"\n🚀 All agents scheduled for market hours execution!")
+        print(f"Congressional agents: {len(congressional_agents)} (execute at market open 9:30 AM ET)")
+        if technical_agents:
+            print(f"Technical agents: {len(technical_agents)} (full market hours - open & close)")
+            print(f"  - {', '.join([agent.agent_id for agent in technical_agents])}")
+        print(f"Total agents: {len(agents)}")
+        print(f"Health server: http://localhost:8080")
+        print(f"Press Ctrl+C to stop all schedulers...\n")
+        
+        # Keep the main thread alive
+        try:
+            while True:
+                time.sleep(60)
+                
+                # Check scheduler health
+                intraday_status = intraday_scheduler.get_status()
+                if not intraday_status['running']:
+                    logger.error("Market hours scheduler stopped running")
+                    break
+        
+        except KeyboardInterrupt:
+            logger.info("Received interrupt signal")
+        
+        finally:
+            # Graceful shutdown
+            logger.info("Shutting down market hours scheduler...")
+            intraday_scheduler.stop()
+            health_server.stop()
+            logger.info("All agents stopped")
+    
+    except Exception as e:
+        logger.error(f"Failed to start schedulers: {e}", exc_info=True)
+        print(f"ERROR: {e}")
+        sys.exit(1)
+
 def main():
     """Main entry point."""
     parser = argparse.ArgumentParser(
@@ -393,7 +462,9 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python main.py scheduler                    # Start the daily scheduler
+  python main.py start                        # Start ALL schedulers together (recommended)
+  python main.py scheduler                    # Start congressional agents only
+  python main.py intraday                     # Start technical agents only
   python main.py run-once                     # Run daily workflow once for today
   python main.py run-once --date 2024-01-15  # Run for specific date
   python main.py test-connections             # Test all API connections
@@ -404,8 +475,12 @@ Examples:
     
     subparsers = parser.add_subparsers(dest='command', help='Available commands')
     
-    # Scheduler command
-    subparsers.add_parser('scheduler', help='Start the daily scheduler')
+    # Start all schedulers command (recommended)
+    subparsers.add_parser('start', help='Start ALL schedulers together (recommended)')
+    
+    # Individual scheduler commands
+    subparsers.add_parser('scheduler', help='[DEPRECATED] Start congressional agents scheduler only (9:30 PM)')
+    subparsers.add_parser('intraday', help='[DEPRECATED] Start technical agents scheduler only')
     
     # Run once command
     run_parser = subparsers.add_parser('run-once', help='Run daily workflow once')
@@ -419,9 +494,6 @@ Examples:
     
     # List agents command
     subparsers.add_parser('list-agents', help='List configured agents')
-    
-    # Intraday scheduler command
-    subparsers.add_parser('intraday', help='Start intraday scheduler for technical agents')
     
     # Andy Grok run once command
     subparsers.add_parser('andy-grok-once', help='Run Andy Grok agent once for testing')
@@ -439,8 +511,12 @@ Examples:
     logger.info(f"Starting Trading Automation System - Command: {args.command}")
     
     try:
-        if args.command == 'scheduler':
+        if args.command == 'start':
+            run_all_schedulers()
+        elif args.command == 'scheduler':
             run_scheduler()
+        elif args.command == 'intraday':
+            run_intraday_scheduler()
         elif args.command == 'run-once':
             run_once(args.date)
         elif args.command == 'test-connections':
@@ -449,8 +525,6 @@ Examples:
             show_status()
         elif args.command == 'list-agents':
             list_agents()
-        elif args.command == 'intraday':
-            run_intraday_scheduler()
         elif args.command == 'andy-grok-once':
             run_andy_grok_once()
         elif args.command == 'intraday-status':

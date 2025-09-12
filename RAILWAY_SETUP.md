@@ -22,8 +22,7 @@ QUIVER_API_KEY=your_quiver_api_key_here
 ```
 ENVIRONMENT=production
 DATABASE_PATH=data/trading_automation.db
-DAILY_EXECUTION_TIME=21:30
-TIMEZONE=US/Eastern
+LOG_LEVEL=INFO
 ```
 
 ## How to Configure on Railway
@@ -65,4 +64,4 @@ Once deployed, your system will be available at:
 - **Dashboard**: https://your-app-name.up.railway.app/
 - **API**: https://your-app-name.up.railway.app/api/agents
 
-The scheduler runs automatically at 9:30 PM EST daily.
+The unified scheduler runs all agents together during market hours (9:30 AM ET).
