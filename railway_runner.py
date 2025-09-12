@@ -141,7 +141,7 @@ class RailwayRunner:
         
     def run(self):
         """Main run method"""
-        logger.info("Starting Railway Trading Automation System")
+        logger.info("Starting Railway Trading Automation System v2.0 - Fixed Process Lifecycle")
         
         # Debug environment variables
         api_keys_status = {
