@@ -185,25 +185,32 @@ def check_external_dependencies() -> Dict[str, Any]:
         from config.settings import settings
         import requests
         
-        # Simple connectivity test (without making actual API calls)
-        response = requests.get(
-            'https://api.quiverquant.com',
-            timeout=10,
-            headers={'Authorization': f'Bearer {settings.api.quiver_api_key}'}
-        )
-        
-        if response.status_code == 401:  # Unauthorized is expected without proper endpoint
-            results['quiver_api'] = {
-                'status': 'healthy',
-                'message': 'API is accessible (authentication endpoint responded)',
-                'response_time': response.elapsed.total_seconds()
-            }
-        else:
+        # Skip if API key is not configured
+        if not settings.api.quiver_api_key:
             results['quiver_api'] = {
                 'status': 'warning',
-                'message': f'Unexpected response code: {response.status_code}',
-                'response_time': response.elapsed.total_seconds()
+                'message': 'Quiver API key not configured'
             }
+        else:
+            # Simple connectivity test (without making actual API calls)
+            response = requests.get(
+                'https://api.quiverquant.com',
+                timeout=10,
+                headers={'Authorization': f'Bearer {settings.api.quiver_api_key}'}
+            )
+            
+            if response.status_code == 401:  # Unauthorized is expected without proper endpoint
+                results['quiver_api'] = {
+                    'status': 'healthy',
+                    'message': 'API is accessible (authentication endpoint responded)',
+                    'response_time': response.elapsed.total_seconds()
+                }
+            else:
+                results['quiver_api'] = {
+                    'status': 'warning',
+                    'message': f'Unexpected response code: {response.status_code}',
+                    'response_time': response.elapsed.total_seconds()
+                }
             
     except requests.exceptions.RequestException as e:
         results['quiver_api'] = {
@@ -221,25 +228,32 @@ def check_external_dependencies() -> Dict[str, Any]:
         from alpaca.trading.client import TradingClient
         from alpaca.common.exceptions import APIError
         
-        trading_client = TradingClient(
-            api_key=settings.api.alpaca_api_key,
-            secret_key=settings.api.alpaca_secret_key,
-            paper=settings.api.alpaca_paper_trading
-        )
-        
-        start_time = time.time()
-        account = trading_client.get_account()
-        response_time = time.time() - start_time
-        
-        results['alpaca_api'] = {
-            'status': 'healthy',
-            'message': f'API accessible, account status: {account.status}',
-            'response_time': response_time,
-            'details': {
-                'account_status': account.status,
-                'paper_trading': settings.api.alpaca_paper_trading
+        # Skip if API keys are not configured
+        if not settings.api.alpaca_api_key or not settings.api.alpaca_secret_key:
+            results['alpaca_api'] = {
+                'status': 'warning',
+                'message': 'Alpaca API keys not configured'
             }
-        }
+        else:
+            trading_client = TradingClient(
+                api_key=settings.api.alpaca_api_key,
+                secret_key=settings.api.alpaca_secret_key,
+                paper=settings.api.alpaca_paper_trading
+            )
+            
+            start_time = time.time()
+            account = trading_client.get_account()
+            response_time = time.time() - start_time
+            
+            results['alpaca_api'] = {
+                'status': 'healthy',
+                'message': f'API accessible, account status: {account.status}',
+                'response_time': response_time,
+                'details': {
+                    'account_status': account.status,
+                    'paper_trading': settings.api.alpaca_paper_trading
+                }
+            }
         
     except APIError as e:
         results['alpaca_api'] = {

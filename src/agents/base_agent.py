@@ -92,11 +92,12 @@ class BaseAgent(ABC):
         # Validate configuration
         self._validate_config()
         
-        # Initialize clients
-        self.db = DatabaseManager()
-        self.alpaca_client = AlpacaClient()
-        self.quiver_client = QuiverClient()
-        self.market_data_service = MarketDataService()
+        # Get shared clients to prevent duplication
+        from src.services.shared_services import shared_services
+        self.db = shared_services.db
+        self.alpaca_client = shared_services.alpaca_client
+        self.quiver_client = shared_services.quiver_client
+        self.market_data_service = shared_services.market_data_service
         
         # Agent parameters
         self.politicians = config.get('politicians', [])

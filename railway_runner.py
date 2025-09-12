@@ -92,6 +92,15 @@ class RailwayRunner:
         """Main run method"""
         logger.info("Starting Railway Trading Automation System")
         
+        # Debug environment variables
+        api_keys_status = {
+            'QUIVER_API_KEY': 'SET' if os.getenv('QUIVER_API_KEY') else 'MISSING',
+            'ALPACA_API_KEY': 'SET' if os.getenv('ALPACA_API_KEY') else 'MISSING', 
+            'ALPACA_SECRET_KEY': 'SET' if os.getenv('ALPACA_SECRET_KEY') else 'MISSING',
+            'PORT': os.getenv('PORT', 'NOT_SET')
+        }
+        logger.info(f"Environment variables status: {api_keys_status}")
+        
         # Set up signal handlers
         signal.signal(signal.SIGTERM, self._signal_handler)
         signal.signal(signal.SIGINT, self._signal_handler)
