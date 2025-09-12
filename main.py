@@ -342,6 +342,18 @@ def show_intraday_status():
         print(f"\nMarket Status:")
         print(f"  Is market day: {'Yes' if market['is_market_day'] else 'No'}")
         print(f"  Timezone: {market['timezone']}")
+        if 'current_time_et' in market:
+            print(f"  Current ET time: {market['current_time_et']}")
+        
+        # Timezone fix status
+        if 'timezone_fix' in status:
+            tz_fix = status['timezone_fix']
+            print(f"\nTimezone Fix:")
+            print(f"  Enabled: {'Yes' if tz_fix['enabled'] else 'No'}")
+            print(f"  Description: {tz_fix['description']}")
+            print(f"  Execution window: {tz_fix['execution_window_minutes']} minutes")
+            if tz_fix['last_execution_dates']:
+                print(f"  Last executions: {dict(tz_fix['last_execution_dates'])}")
         
         print(f"{'='*60}\n")
     

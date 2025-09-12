@@ -76,6 +76,9 @@ class IntradayScheduler:
         # Market timezone
         self.market_tz = pytz.timezone('US/Eastern')
         
+        # Track last execution dates in ET to prevent duplicates
+        self.last_execution_dates: Dict[str, str] = {}  # task_id -> YYYY-MM-DD in ET
+        
         # Scheduler statistics
         self.stats = SchedulerStats(
             active_tasks=0,
@@ -231,24 +234,75 @@ class IntradayScheduler:
         return False
     
     def _schedule_task(self, task: IntradayTask) -> None:
-        """Schedule a single task with the Python schedule library."""
+        """Schedule a single task with ET timezone awareness."""
         if not task.enabled:
             return
         
-        execution_time = task.execution_time
-        
         def job():
             if task.enabled and not self.stop_event.is_set():
-                self._execute_task(task)
+                if self._should_fire_now(task):
+                    self._execute_task(task)
         
-        # Schedule task for weekdays only (Monday=0, Friday=4)
-        schedule.every().monday.at(execution_time).do(job)
-        schedule.every().tuesday.at(execution_time).do(job)
-        schedule.every().wednesday.at(execution_time).do(job)
-        schedule.every().thursday.at(execution_time).do(job)
-        schedule.every().friday.at(execution_time).do(job)
+        # Schedule minute-based check instead of timezone-naive at() method
+        # This will check every minute if the task should fire
+        schedule.every().minute.do(job)
         
-        logger.debug(f"Scheduled task {task.task_id} for weekdays at {execution_time}")
+        logger.debug(f"Scheduled task {task.task_id} for ET timezone check at {task.execution_time}")
+    
+    def _should_fire_now(self, task: IntradayTask) -> bool:
+        """
+        Check if a task should fire now based on ET timezone.
+        
+        Uses minute-by-minute checking to handle timezone properly on Railway (UTC).
+        Prevents duplicate executions by tracking last execution date in ET.
+        
+        Args:
+            task: Task to check
+            
+        Returns:
+            True if task should execute now
+        """
+        try:
+            # Get current time in ET timezone
+            now_et = datetime.now(self.market_tz)
+            current_time = now_et.time()
+            current_date_str = now_et.strftime('%Y-%m-%d')
+            
+            # Parse task execution time
+            target_hour, target_minute = map(int, task.execution_time.split(':'))
+            target_time = dt_time(target_hour, target_minute)
+            
+            # Check if we're in the execution window (3-minute window after target time)
+            target_seconds = target_hour * 3600 + target_minute * 60
+            current_seconds = current_time.hour * 3600 + current_time.minute * 60 + current_time.second
+            
+            # Fire within 3 minutes after target time
+            if target_seconds <= current_seconds <= target_seconds + 180:  # 180 seconds = 3 minutes
+                
+                # Check if we already executed today (prevent duplicates)
+                last_execution_date = self.last_execution_dates.get(task.task_id)
+                if last_execution_date == current_date_str:
+                    logger.debug(f"Task {task.task_id} already executed today ({current_date_str})")
+                    return False
+                
+                # Check if it's a trading day for market-related tasks
+                if task.schedule_type in [ScheduleType.MARKET_OPEN, ScheduleType.MARKET_CLOSE]:
+                    if not self._is_market_day():
+                        logger.debug(f"Task {task.task_id} skipped - not a market day")
+                        return False
+                
+                logger.info(f"Task {task.task_id} should fire now at {now_et.strftime('%H:%M:%S')} ET")
+                
+                # Update last execution date to prevent duplicates
+                self.last_execution_dates[task.task_id] = current_date_str
+                
+                return True
+            
+            return False
+            
+        except Exception as e:
+            logger.error(f"Error checking if task {task.task_id} should fire: {e}")
+            return False
     
     def _execute_task(self, task: IntradayTask) -> None:
         """Execute a single intraday task."""
@@ -488,7 +542,14 @@ class IntradayScheduler:
             },
             'market_status': {
                 'is_market_day': self._is_market_day(),
-                'timezone': str(self.market_tz)
+                'timezone': str(self.market_tz),
+                'current_time_et': datetime.now(self.market_tz).strftime('%Y-%m-%d %H:%M:%S %Z')
+            },
+            'timezone_fix': {
+                'enabled': True,
+                'description': 'Using ET timezone-aware minute-based checks instead of timezone-naive at() scheduling',
+                'execution_window_minutes': 3,
+                'last_execution_dates': self.last_execution_dates
             }
         }
     
