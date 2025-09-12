@@ -276,8 +276,21 @@ class IntradayScheduler:
             target_seconds = target_hour * 3600 + target_minute * 60
             current_seconds = current_time.hour * 3600 + current_time.minute * 60 + current_time.second
             
-            # Fire within 3 minutes after target time
-            if target_seconds <= current_seconds <= target_seconds + 180:  # 180 seconds = 3 minutes
+            # Check if we should fire - either in the normal window OR as catch-up during trading hours
+            time_since_target = current_seconds - target_seconds
+            
+            # Handle day boundary crossing (e.g., target is 23:30, current is 01:00 next day)
+            if time_since_target < -12 * 3600:  # More than 12 hours behind means we crossed midnight
+                time_since_target += 24 * 3600
+            
+            # Fire if:
+            # 1. Within 3 minutes after target time (normal execution window), OR
+            # 2. It's later in the day during market hours and we haven't executed today (catch-up)
+            is_normal_window = 0 <= time_since_target <= 180  # 0-3 minutes after target
+            is_market_hours = dt_time(9, 30) <= current_time <= dt_time(16, 0)  # Market hours 9:30 AM - 4:00 PM ET
+            is_catchup_needed = current_seconds > target_seconds and is_market_hours
+            
+            if is_normal_window or is_catchup_needed:
                 
                 # Check if we already executed today (prevent duplicates)
                 last_execution_date = self.last_execution_dates.get(task.task_id)
@@ -296,7 +309,19 @@ class IntradayScheduler:
                 # Update last execution date to prevent duplicates
                 self.last_execution_dates[task.task_id] = current_date_str
                 
+                # Log execution reason
+                if is_normal_window:
+                    logger.info(f"Task {task.task_id} firing in normal window at {now_et.strftime('%H:%M:%S')} ET")
+                else:
+                    logger.info(f"Task {task.task_id} firing as catch-up during market hours at {now_et.strftime('%H:%M:%S')} ET")
+                
                 return True
+            else:
+                # Log why we're not firing
+                if not is_market_hours and current_seconds > target_seconds:
+                    logger.debug(f"Task {task.task_id} missed today - outside market hours")
+                elif current_seconds < target_seconds:
+                    logger.debug(f"Task {task.task_id} not yet time - {abs(time_since_target)//60:.0f}m {abs(time_since_target)%60:.0f}s before target")
             
             return False
             
