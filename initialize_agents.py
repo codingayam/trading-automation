@@ -23,9 +23,15 @@ def main():
         
         # Initialize database
         logger.info("Initializing database...")
-        if not initialize_database():
-            logger.error("Database initialization failed")
-            print("❌ Database initialization failed")
+        try:
+            if not initialize_database():
+                logger.error("Database initialization failed")
+                print("❌ Database initialization failed")
+                return False
+        except Exception as e:
+            logger.error(f"Database initialization exception: {e}")
+            print(f"❌ Database initialization failed with error: {e}")
+            print(f"📍 Check permissions on /app/data directory")
             return False
         
         print("✅ Database initialized")
