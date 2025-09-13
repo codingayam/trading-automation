@@ -15,8 +15,18 @@ class HealthStatus(Enum):
     UNHEALTHY = "unhealthy"
     DISABLED = "disabled"
 
-from src.utils.monitoring import health_checker, metrics_collector, system_monitor
 from src.utils.logging import get_logger
+
+# Safe imports for Railway environment
+try:
+    from src.utils.monitoring import health_checker, metrics_collector, system_monitor
+    MONITORING_AVAILABLE = True
+except ImportError as e:
+    # Fallback for environments where monitoring is not available
+    MONITORING_AVAILABLE = False
+    health_checker = None
+    metrics_collector = None  
+    system_monitor = None
 
 logger = get_logger('health')
 
@@ -28,16 +38,24 @@ def create_health_app() -> Flask:
     def health_check():
         """Get overall system health status."""
         try:
-            health_status = health_checker.get_system_health()
-            
-            # Set HTTP status code based on health
-            status_code = 200
-            if health_status['status'] == 'unhealthy':
-                status_code = 503
-            elif health_status['status'] == 'warning':
-                status_code = 200  # Still OK, but with warnings
-            
-            return jsonify(health_status), status_code
+            if MONITORING_AVAILABLE and health_checker:
+                health_status = health_checker.get_system_health()
+                
+                # Set HTTP status code based on health
+                status_code = 200
+                if health_status['status'] == 'unhealthy':
+                    status_code = 503
+                elif health_status['status'] == 'warning':
+                    status_code = 200  # Still OK, but with warnings
+                
+                return jsonify(health_status), status_code
+            else:
+                # Simple health check for Railway
+                return jsonify({
+                    'status': 'healthy',
+                    'message': 'Trading automation system is running',
+                    'timestamp': time.time()
+                }), 200
             
         except Exception as e:
             logger.error("Health check endpoint failed", exception=e)
@@ -51,20 +69,28 @@ def create_health_app() -> Flask:
     def component_health(component: str):
         """Get health status for specific component."""
         try:
-            result = health_checker.run_check(component)
-            
-            status_code = 200
-            if result.status == 'unhealthy':
-                status_code = 503
-            
-            return jsonify({
-                'component': result.component,
-                'status': result.status,
-                'message': result.message,
-                'timestamp': result.timestamp.isoformat(),
-                'response_time': result.response_time,
-                'details': result.details
-            }), status_code
+            if MONITORING_AVAILABLE and health_checker:
+                result = health_checker.run_check(component)
+                
+                status_code = 200
+                if result.status == 'unhealthy':
+                    status_code = 503
+                
+                return jsonify({
+                    'component': result.component,
+                    'status': result.status,
+                    'message': result.message,
+                    'timestamp': result.timestamp.isoformat(),
+                    'response_time': result.response_time,
+                    'details': result.details
+                }), status_code
+            else:
+                return jsonify({
+                    'component': component,
+                    'status': 'unavailable',
+                    'message': 'Monitoring not available in this environment',
+                    'timestamp': time.time()
+                }), 503
             
         except Exception as e:
             logger.error(f"Component health check failed for {component}", exception=e)
@@ -79,6 +105,12 @@ def create_health_app() -> Flask:
     def metrics():
         """Get performance metrics summary."""
         try:
+            if not MONITORING_AVAILABLE or not metrics_collector:
+                return jsonify({
+                    'error': 'Metrics collection not available in this environment',
+                    'timestamp': time.time()
+                }), 503
+            
             # Get query parameters
             metric_name = request.args.get('metric')
             hours = int(request.args.get('hours', 24))
@@ -112,6 +144,12 @@ def create_health_app() -> Flask:
     def system_stats():
         """Get system resource statistics."""
         try:
+            if not MONITORING_AVAILABLE or not system_monitor:
+                return jsonify({
+                    'error': 'System monitoring not available in this environment',
+                    'timestamp': time.time()
+                }), 503
+                
             stats = system_monitor.get_system_stats()
             return jsonify(stats)
             
@@ -145,6 +183,12 @@ class HealthServer:
     
     def start(self):
         """Start the health check server in a background thread."""
+        # Skip health server in Railway environment - dashboard handles health checks
+        import os
+        if os.getenv('RAILWAY_ENVIRONMENT_NAME') or os.getenv('PORT'):
+            logger.info("Railway environment detected - skipping health server (dashboard handles health checks)")
+            return
+            
         if self.running:
             logger.warning("Health server is already running")
             return
@@ -170,6 +214,11 @@ class HealthServer:
     
     def stop(self):
         """Stop the health check server."""
+        import os
+        if os.getenv('RAILWAY_ENVIRONMENT_NAME') or os.getenv('PORT'):
+            logger.info("Railway environment - health server was not started")
+            return
+            
         if not self.running:
             return
         
@@ -270,6 +319,9 @@ def check_external_dependencies() -> Dict[str, Any]:
 
 def register_external_dependency_checks():
     """Register health checks for external dependencies."""
+    if not MONITORING_AVAILABLE or not health_checker:
+        logger.info("Monitoring not available - skipping external dependency checks registration")
+        return
     
     def external_dependencies_check():
         """Health check for external service dependencies."""
