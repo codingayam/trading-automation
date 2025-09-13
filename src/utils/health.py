@@ -111,6 +111,12 @@ class HealthServer:
 
     def start(self):
         """Start the health check server in a separate thread."""
+        # Skip health server in Railway environment - dashboard handles health checks
+        import os
+        if os.getenv('RAILWAY_ENVIRONMENT_NAME') or os.getenv('PORT'):
+            logger.info("Railway environment detected - skipping health server (dashboard handles health checks)")
+            return
+            
         if self._thread is not None and self._thread.is_alive():
             logger.warning("Health server is already running.")
             return
@@ -132,9 +138,15 @@ class HealthServer:
         self._thread.start()
         
     def stop(self):
+        """Stop the health check server."""
+        import os
+        if os.getenv('RAILWAY_ENVIRONMENT_NAME') or os.getenv('PORT'):
+            logger.info("Railway environment - health server was not started")
+            return
+            
         # This is a bit tricky with daemon threads and servers.
         # For this app, we'll just let the daemon thread die with the main process.
-        logger.info("Health server will stop with the main application.")
+        logger.info("Health server stopped")
 
 
 # Global instances to be used across the application
