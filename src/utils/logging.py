@@ -126,49 +126,59 @@ class TradingLogger:
 
 def setup_logging() -> None:
     """Set up logging configuration for the trading system."""
-    # Ensure log directory exists
-    log_dir = Path(settings.logging.full_path)
-    log_dir.mkdir(parents=True, exist_ok=True)
-    
-    # Configure root logger
     root_logger = logging.getLogger()
     root_logger.setLevel(getattr(logging, settings.logging.level.upper()))
     
-    # Clear existing handlers
-    root_logger.handlers.clear()
-    
-    # Create file handler with rotation
-    log_file = log_dir / 'trading_automation.log'
-    file_handler = logging.handlers.TimedRotatingFileHandler(
-        filename=log_file,
-        when='midnight',
-        interval=1,
-        backupCount=settings.logging.retention_days,
-        encoding='utf-8'
-    )
-    file_handler.setFormatter(StructuredFormatter())
-    root_logger.addHandler(file_handler)
-    
-    # Create console handler for development
-    if settings.is_development:
+    # Clear any existing handlers to avoid duplicate logs
+    if root_logger.hasHandlers():
+        root_logger.handlers.clear()
+
+    if settings.is_production:
+        # On Railway (production), log JSON directly to the console/stdout
+        console_handler = logging.StreamHandler()
+        formatter = StructuredFormatter()
+        console_handler.setFormatter(formatter)
+        root_logger.addHandler(console_handler)
+        
+        logger = get_logger('system')
+        logger.info(
+            "Production logging configured (JSON to console)",
+            log_level=settings.logging.level
+        )
+    else:
+        # In development, log text to console and JSON to files
+        log_dir = Path(settings.logging.full_path)
+        log_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Console handler with simple text format
         console_handler = logging.StreamHandler()
         console_formatter = logging.Formatter(
             '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
         )
         console_handler.setFormatter(console_formatter)
         root_logger.addHandler(console_handler)
-    
-    # Create separate handlers for different components
-    _setup_component_loggers(log_dir)
-    
-    # Log startup message
-    logger = get_logger('system')
-    logger.info(
-        "Logging system initialized",
-        log_level=settings.logging.level,
-        log_path=str(log_file),
-        retention_days=settings.logging.retention_days
-    )
+        
+        # File handler with structured JSON format
+        log_file = log_dir / 'trading_automation.log'
+        file_handler = logging.handlers.TimedRotatingFileHandler(
+            filename=log_file,
+            when='midnight',
+            interval=1,
+            backupCount=settings.logging.retention_days,
+            encoding='utf-8'
+        )
+        file_handler.setFormatter(StructuredFormatter())
+        root_logger.addHandler(file_handler)
+        
+        # Set up separate log files for different components
+        _setup_component_loggers(log_dir)
+        
+        logger = get_logger('system')
+        logger.info(
+            "Development logging configured (text to console, JSON to files)",
+            log_level=settings.logging.level,
+            log_path=str(log_file)
+        )
 
 def _setup_component_loggers(log_dir: Path) -> None:
     """Set up specialized loggers for different system components."""
