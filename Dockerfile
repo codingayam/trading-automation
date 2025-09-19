@@ -57,7 +57,7 @@ RUN if [ ! -f .env ]; then cp .env.example .env; fi
 USER trading
 
 # Initialize database
-RUN python src/data/init_db.py
+RUN python -m src.data.init_db
 
 # Expose ports
 EXPOSE 5000 8080
