@@ -42,7 +42,7 @@ Use Railway Cron to trigger the congressional copy-trading workflow once per day
 3. Command: `python main.py run-once`
 4. Select the same service/environment and save
 
-_Repo includes `railway.toml` with the same schedule. If you prefer config-as-code, run `railway up --prompt crons` after deploying and Railway will sync the cron from that file._
+_Repo includes `railway.toml` with the same schedule. After a deploy, run `railway up --prompt crons` (or use "Apply Config" in the UI) once to register the job; future changes to the file will sync the schedule automatically._
 
 Railway will continue to:
 - Build using `Dockerfile.railway`
