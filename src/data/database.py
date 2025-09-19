@@ -194,7 +194,11 @@ class DatabaseManager:
         
         # Get the inserted trade ID
         result = self.execute_single("SELECT last_insert_rowid() as id")
-        trade_id = result['id'] if result else None
+        if result is None:
+            trade_id = None
+        else:
+            # sqlite3.Row behaves like a mapping but does not expose .get
+            trade_id = result['id'] if 'id' in result.keys() else result[0]
         
         logger.info(
             "Trade record inserted",
