@@ -26,7 +26,8 @@ FROM python:3.11-slim as production
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app
 
 # Create non-root user for security
 RUN groupadd -r trading && useradd -r -g trading trading
@@ -57,7 +58,7 @@ RUN if [ ! -f .env ]; then cp .env.example .env; fi
 USER trading
 
 # Initialize database
-RUN python -m src.data.init_db
+RUN python3 -m src.data.init_db
 
 # Expose ports
 EXPOSE 5000 8080
