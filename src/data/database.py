@@ -419,7 +419,13 @@ def insert_trade(agent_id: str, ticker: str, trade_data: Dict[str, Any]) -> int:
     db.execute_modify(query, params)
     
     # Get the inserted trade ID
-    trade_id = db.execute_single("SELECT last_insert_rowid() as id").get('id')
+    last_row = db.execute_single("SELECT last_insert_rowid() as id")
+    if last_row is None:
+        trade_id = None
+    elif 'id' in last_row.keys():
+        trade_id = last_row['id']
+    else:
+        trade_id = last_row[0]
     
     logger.info(
         "Trade record inserted",
