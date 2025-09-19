@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Railway-specific runner that starts both dashboard and scheduler in one process.
-This avoids supervisord complexity and Railway deployment issues.
+Railway-specific runner that serves the dashboard (always) and optionally starts
+the intraday scheduler when explicitly enabled via environment variable.
 """
 
 import os
@@ -159,9 +159,13 @@ class RailwayRunner:
         try:
             # Start dashboard (required)
             self.start_dashboard()
-            
-            # Start scheduler (optional)
-            self.start_scheduler()
+
+            # Start scheduler only when explicitly enabled (e.g. intraday agents)
+            enable_intraday = os.getenv('ENABLE_INTRADAY_WORKER', 'false').lower() == 'true'
+            if enable_intraday:
+                self.start_scheduler()
+            else:
+                logger.info("Intraday scheduler disabled (ENABLE_INTRADAY_WORKER!=true). Use Railway Cron for daily runs.")
             
             # Wait for shutdown signal or dashboard failure
             while not self.shutdown_event.is_set():

@@ -92,7 +92,7 @@ class TestDataProcessor:
         # Mock all the sub-processes
         processor._create_data_backup = Mock()
         processor._fetch_congressional_trades = Mock(return_value=[sample_congressional_trade])
-        processor._process_agent_trades = Mock(return_value=1)
+        processor._process_agent_trades = Mock()
         processor._synchronize_portfolios = Mock()
         processor._update_performance_metrics = Mock()
         processor._validate_data_consistency = Mock(return_value={'warnings': []})
@@ -106,13 +106,13 @@ class TestDataProcessor:
         result = processor.process_daily_data(target_date)
         
         assert result.success is True
-        assert result.processed_trades == 1
+        assert result.processed_trades == 0
         assert len(result.errors) == 0
         
         # Verify all steps were called
         processor._create_data_backup.assert_called_once()
         processor._fetch_congressional_trades.assert_called_once_with(target_date)
-        processor._process_agent_trades.assert_called_once()
+        processor._process_agent_trades.assert_not_called()
         processor._synchronize_portfolios.assert_called_once()
         processor._update_performance_metrics.assert_called_once()
         processor._validate_data_consistency.assert_called_once()

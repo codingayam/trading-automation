@@ -34,28 +34,34 @@ QUIVER_API_KEY=your_quiver_key_here
 LOG_LEVEL=INFO
 ```
 
-### 4. Automatic Deployment
-Railway will automatically:
+### 4. Configure Daily Execution
+Use Railway Cron to trigger the congressional copy-trading workflow once per day:
+
+1. Open **Cron Jobs** → **New Job**
+2. Set schedule to `30 01 * * *` (01:30 UTC = 9:30 PM ET)
+3. Command: `python main.py run-once`
+4. Select the same service/environment and save
+
+Railway will continue to:
 - Build using `Dockerfile.railway`
-- Start both the scheduler and dashboard
-- Provide a public URL for the dashboard
+- Run the always-on dashboard service
 - Redeploy whenever you push to GitHub
 
-That's it! Your trading automation system is now deployed and running in the cloud! 🎉
+That's it! Your dashboard is live and trading runs nightly via Cron. 🎉
 
 ## What Gets Deployed
 
 The simplified Railway deployment includes:
 
-### ✅ Unified Scheduler Service
-- Runs `python main.py start`
-- Executes ALL agents together during market hours (9:30 AM ET)
-- Congressional and technical agents in single process
+### ✅ Dashboard Service (Always On)
+- Runs the Flask dashboard + APIs
+- Provides visibility into agent performance and holdings
+- Serves health checks for Railway
 
-### ✅ Dashboard Service  
-- Runs Flask web interface
-- Accessible via Railway's public URL
-- Shows trading performance and agent status
+### ✅ Daily Trading Job (Railway Cron)
+- Executes `python main.py run-once`
+- Pulls Quiver data and runs agent workflows at 9:30 PM ET
+- Places GTC orders via Alpaca in a single pass
 
 ### ✅ Health Monitoring
 - Health check endpoint at `/health`
@@ -75,11 +81,13 @@ The system uses SQLite database stored on Railway volume:
 
 ```
 Railway Service (Single Container)
-├── Supervisor (Process Manager)
-│   ├── Unified Scheduler Process (main.py start)
-│   └── Dashboard Process (Flask app)
-├── SQLite Database (file storage)
+├── Supervisor (process manager)
+│   └── Dashboard & API (Flask)
+├── SQLite Database (persistent volume)
 └── Health Check Endpoint
+
+Railway Cron Job (managed by Railway)
+└── python main.py run-once  # nightly trading workflow
 ```
 
 ## Cost Estimate

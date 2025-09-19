@@ -105,6 +105,15 @@ class BaseAgent(ABC):
         self.position_size_type = config.get('parameters', {}).get('position_size_type', 'fixed')
         self.position_size_value = config.get('parameters', {}).get('position_size_value', 100)
         self.match_threshold = config.get('parameters', {}).get('match_threshold', 0.85)
+        self.copy_trade_multiplier = config.get('parameters', {}).get('copy_trade_multiplier', 1.0)
+        self.order_time_in_force = config.get('parameters', {}).get('order_time_in_force', 'gtc').lower()
+        if self.order_time_in_force not in {'day', 'gtc'}:
+            logger.warning(
+                "Invalid time_in_force '%s' for agent %s. Defaulting to GTC.",
+                self.order_time_in_force,
+                agent_id
+            )
+            self.order_time_in_force = 'gtc'
         
         # State tracking
         self.last_execution_time = None
@@ -131,7 +140,8 @@ class BaseAgent(ABC):
         numeric_params = {
             'minimum_trade_value': (1000, 1000000),
             'position_size_value': (1, 10000),
-            'match_threshold': (0.1, 1.0)
+            'match_threshold': (0.1, 1.0),
+            'copy_trade_multiplier': (0.1, 5.0)
         }
         
         for param, (min_val, max_val) in numeric_params.items():
@@ -140,10 +150,14 @@ class BaseAgent(ABC):
                 raise ValidationError(f"Parameter {param} must be between {min_val} and {max_val}")
         
         # Validate position size type
-        valid_size_types = ['fixed', 'percentage', 'dynamic']
+        valid_size_types = ['fixed', 'percentage', 'dynamic', 'copy_trade']
         size_type = parameters.get('position_size_type', 'fixed')
         if size_type not in valid_size_types:
             raise ValidationError(f"Invalid position_size_type: {size_type}. Must be one of {valid_size_types}")
+
+        time_in_force = parameters.get('order_time_in_force')
+        if time_in_force and time_in_force.lower() not in {'day', 'gtc'}:
+            raise ValidationError("order_time_in_force must be 'day' or 'gtc'")
     
     def process_trades(self, congressional_data: List[CongressionalTrade]) -> List[TradeDecision]:
         """
@@ -253,11 +267,11 @@ class BaseAgent(ABC):
         """
         if self.position_size_type == 'fixed':
             return max(self.position_size_value, 100.0)  # Minimum $100
-        
+
         elif self.position_size_type == 'percentage':
             # Use percentage of congressional trade amount
             return max(trade.amount_max * (self.position_size_value / 100), 100.0)
-        
+
         elif self.position_size_type == 'dynamic':
             # Dynamic sizing based on portfolio size (future enhancement)
             current_portfolio_value = self._get_current_portfolio_value()
@@ -266,7 +280,19 @@ class BaseAgent(ABC):
                 return max(current_portfolio_value * target_percentage, 100.0)
             else:
                 return 100.0
-        
+
+        elif self.position_size_type == 'copy_trade':
+            base_amount = trade.amount_max or trade.amount_min or 0.0
+            if base_amount <= 0 and trade.amount_min > 0:
+                base_amount = trade.amount_min
+            if base_amount <= 0:
+                base_amount = self.minimum_trade_value
+
+            multiplier = max(self.copy_trade_multiplier, 0.0)
+            trade_amount = base_amount * multiplier if multiplier > 0 else base_amount
+
+            return max(trade_amount, settings.trading.minimum_amount)
+
         else:
             logger.warning(f"Unknown position size type: {self.position_size_type}")
             return 100.0
@@ -313,7 +339,7 @@ class BaseAgent(ABC):
                 )
             else:
                 # Regular buy orders can use fractional amounts
-                time_in_force = 'day' if trade_decision.amount < 1000 else 'gtc'
+                time_in_force = self.order_time_in_force
                 order_info = self.alpaca_client.place_market_order(
                     ticker=trade_decision.ticker,
                     side=trade_decision.side,

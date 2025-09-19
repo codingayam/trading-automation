@@ -427,7 +427,12 @@ def get_agent_detail(agent_id: str):
                 'todays_pnl_percent_formatted': format_percentage(position_detail['todays_pnl_percent']),
                 'total_pnl_percent_formatted': format_percentage(position_detail['total_pnl_percent'])
             })
-            
+
+            nav_percent = (position_detail['market_value'] / total_value * 100) if total_value else 0.0
+            position_detail['nav_percent'] = nav_percent
+            position_detail['nav_percent_formatted'] = format_percentage(nav_percent)
+            position_detail['amount_formatted'] = position_detail['market_value_formatted']
+
             position_details.append(position_detail)
         
         # Sort positions by market value descending

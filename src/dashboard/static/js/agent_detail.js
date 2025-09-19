@@ -182,28 +182,19 @@ class AgentDetailDashboard {
         tbody.innerHTML = sortedPositions.map(position => `
             <tr class="position-row">
                 <td class="font-medium">
-                    ${this.escapeHtml(position.asset || position.ticker)}
-                </td>
-                <td class="text-right">
-                    ${this.formatNumber(position.qty || Math.abs(position.quantity), 0)}
-                </td>
-                <td class="text-center">
-                    <span class="side-badge ${(position.side || '').toLowerCase()}">${position.side || (position.quantity >= 0 ? 'Long' : 'Short')}</span>
+                    ${this.escapeHtml(position.ticker || position.asset)}
                 </td>
                 <td class="text-right font-medium">
-                    ${position.market_value_formatted || this.formatCurrency(position.market_value)}
+                    ${position.amount_formatted || position.market_value_formatted || this.formatCurrency(position.market_value)}
+                </td>
+                <td class="text-right">
+                    ${position.nav_percent_formatted || this.formatPercentage(position.nav_percent)}
                 </td>
                 <td class="text-right ${this.getReturnClass(position.todays_pnl_percent)}">
                     ${position.todays_pnl_percent_formatted || this.formatPercentage(position.todays_pnl_percent)}
                 </td>
-                <td class="text-right ${this.getReturnClass(position.todays_pnl_dollars)}">
-                    ${position.todays_pnl_dollars_formatted || this.formatCurrency(position.todays_pnl_dollars)}
-                </td>
                 <td class="text-right ${this.getReturnClass(position.total_pnl_percent)}">
                     ${position.total_pnl_percent_formatted || this.formatPercentage(position.total_pnl_percent)}
-                </td>
-                <td class="text-right ${this.getReturnClass(position.total_pnl_dollars)}">
-                    ${position.total_pnl_dollars_formatted || this.formatCurrency(position.total_pnl_dollars)}
                 </td>
             </tr>
         `).join('');

@@ -209,7 +209,8 @@ class AgentFactory:
         numeric_validations = {
             'minimum_trade_value': (1000, 1000000),
             'position_size_value': (1, 10000),
-            'match_threshold': (0.1, 1.0)
+            'match_threshold': (0.1, 1.0),
+            'copy_trade_multiplier': (0.1, 5.0)
         }
         
         for param, (min_val, max_val) in numeric_validations.items():

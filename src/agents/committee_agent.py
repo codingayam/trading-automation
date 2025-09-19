@@ -4,10 +4,14 @@ Tracks trades by multiple politicians who are members of a committee.
 """
 from typing import Dict, List, Any, Optional, Set
 from difflib import SequenceMatcher
+from functools import lru_cache
+from pathlib import Path
+import json
 
 from src.agents.base_agent import BaseAgent
 from src.data.quiver_client import CongressionalTrade
 from src.utils.logging import get_logger
+from config.settings import PROJECT_ROOT
 
 logger = get_logger(__name__)
 
@@ -320,19 +324,41 @@ class TransportationCommitteeAgent(CommitteeAgent):
     """Specialized agent for tracking Transportation & Infrastructure Committee trades."""
     
     def __init__(self, agent_id: str, config: dict):
-        # Ensure configuration includes Transportation Committee members
-        transportation_members = [
-            "Peter DeFazio",
-            "Sam Graves", 
-            "Eleanor Holmes Norton",
-            "Rick Larsen",
-            "Garret Graves",
-            "Donald Payne Jr.",
-            "Mark DeSaulnier", 
-            "Stacey Plaskett",
-            "Stephen Lynch",
-            "Salud Carbajal"
-        ]
-        
-        config['politicians'] = transportation_members
+        file_members = self._load_transportation_members()
+        if file_members:
+            config['politicians'] = file_members
+        elif not config.get('politicians'):
+            logger.warning(
+                "Transportation committee file missing or empty; using default list from configuration"
+            )
         super().__init__(agent_id, config)
+
+    @staticmethod
+    @lru_cache(maxsize=1)
+    def _load_transportation_members() -> List[str]:
+        """Load committee roster from JSON input file."""
+        committee_path = Path(PROJECT_ROOT) / 'inputs' / 'committee-transportation-infra.json'
+
+        if not committee_path.exists():
+            logger.error("Transportation committee roster file not found at %s", committee_path)
+            return []
+
+        try:
+            with committee_path.open('r', encoding='utf-8') as f:
+                data = json.load(f)
+
+            members: List[str] = []
+            for caucus in ('republicans', 'democrats'):
+                for entry in data.get(caucus, []):
+                    name = entry.get('name')
+                    if name:
+                        members.append(name)
+
+            if not members:
+                logger.error("Transportation committee file (%s) contains no member names", committee_path)
+
+            return members
+
+        except (json.JSONDecodeError, OSError) as exc:
+            logger.error("Failed to load transportation committee roster: %s", exc)
+            return []

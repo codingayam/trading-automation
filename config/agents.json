@@ -20,9 +20,11 @@
       "enabled": true,
       "parameters": {
         "minimum_trade_value": 50000,
-        "position_size_type": "fixed",
+        "position_size_type": "copy_trade",
         "position_size_value": 100,
-        "match_threshold": 0.85
+        "copy_trade_multiplier": 1.0,
+        "match_threshold": 0.85,
+        "order_time_in_force": "gtc"
       }
     },
     {
@@ -36,9 +38,11 @@
       "enabled": true,
       "parameters": {
         "minimum_trade_value": 50000,
-        "position_size_type": "fixed", 
+        "position_size_type": "copy_trade", 
         "position_size_value": 100,
-        "match_threshold": 0.85
+        "copy_trade_multiplier": 1.0,
+        "match_threshold": 0.85,
+        "order_time_in_force": "gtc"
       }
     },
     {
@@ -52,9 +56,11 @@
       "enabled": true,
       "parameters": {
         "minimum_trade_value": 50000,
-        "position_size_type": "fixed",
+        "position_size_type": "copy_trade",
         "position_size_value": 100,
-        "match_threshold": 0.85
+        "copy_trade_multiplier": 1.0,
+        "match_threshold": 0.85,
+        "order_time_in_force": "gtc"
       }
     },
     {
@@ -68,9 +74,11 @@
       "enabled": true,
       "parameters": {
         "minimum_trade_value": 50000,
-        "position_size_type": "fixed",
+        "position_size_type": "copy_trade",
         "position_size_value": 100,
-        "match_threshold": 0.85
+        "copy_trade_multiplier": 1.0,
+        "match_threshold": 0.85,
+        "order_time_in_force": "gtc"
       }
     },
     {
@@ -84,9 +92,11 @@
       "enabled": true,
       "parameters": {
         "minimum_trade_value": 50000,
-        "position_size_type": "fixed",
+        "position_size_type": "copy_trade",
         "position_size_value": 100,
-        "match_threshold": 0.85
+        "copy_trade_multiplier": 1.0,
+        "match_threshold": 0.85,
+        "order_time_in_force": "gtc"
       }
     },
     {
@@ -108,7 +118,8 @@
         "rsi_lookback_hours": 14,
         "market_open_time": "09:30",
         "market_close_time": "16:00",
-        "position_close_time": "15:55"
+        "position_close_time": "15:55",
+        "order_time_in_force": "day"
       }
     }
   ],

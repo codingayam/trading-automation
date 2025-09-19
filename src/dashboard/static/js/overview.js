@@ -127,7 +127,7 @@ class OverviewDashboard {
         if (!agents || agents.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="7" class="text-center text-muted">
+                    <td colspan="3" class="text-center text-muted">
                         No agents configured or data available
                     </td>
                 </tr>
@@ -137,40 +137,29 @@ class OverviewDashboard {
             return;
         }
         
-        tbody.innerHTML = agents.map(agent => `
-            <tr data-agent-id="${agent.agent_id}" class="agent-row">
-                <td>
-                    <div>
-                        <div class="font-medium">${this.escapeHtml(agent.name)}</div>
-                        <div class="text-muted" style="font-size: 0.875rem;">
-                            ${this.escapeHtml(agent.description || '')}
+        tbody.innerHTML = agents.map(agent => {
+            const description = [agent.type, agent.description]
+                .filter(Boolean)
+                .map(text => this.escapeHtml(String(text)))
+                .join(' • ');
+
+            return `
+                <tr data-agent-id="${agent.agent_id}" class="agent-row">
+                    <td>
+                        <div>
+                            <div class="font-medium">${this.escapeHtml(agent.name)}</div>
+                            ${description ? `<div class="text-muted" style="font-size: 0.875rem;">${description}</div>` : ''}
                         </div>
-                    </div>
-                </td>
-                <td>
-                    <span class="status-badge ${agent.type === 'committee' ? 'active' : 'inactive'}">
-                        ${agent.type}
-                    </span>
-                </td>
-                <td class="font-medium">
-                    ${agent.total_value_formatted || '$0.00'}
-                </td>
-                <td class="text-center">
-                    ${agent.position_count || 0}
-                </td>
-                <td class="${this.getReturnClass(agent.daily_return_pct)}">
-                    ${agent.daily_return_formatted || '0.00%'}
-                </td>
-                <td class="${this.getReturnClass(agent.total_return_pct)}">
-                    ${agent.total_return_formatted || '0.00%'}
-                </td>
-                <td>
-                    <span class="status-badge ${agent.enabled ? 'active' : 'inactive'}">
-                        ${agent.enabled ? 'Active' : 'Inactive'}
-                    </span>
-                </td>
-            </tr>
-        `).join('');
+                    </td>
+                    <td class="${this.getReturnClass(agent.daily_return_pct)} font-medium">
+                        ${agent.daily_return_formatted || '0.00%'}
+                    </td>
+                    <td class="${this.getReturnClass(agent.total_return_pct)} font-medium">
+                        ${agent.total_return_formatted || '0.00%'}
+                    </td>
+                </tr>
+            `;
+        }).join('');
         
         tableContainer.style.display = 'block';
         this.hideLoading();

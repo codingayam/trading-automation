@@ -298,20 +298,13 @@ body {
 }
 
 /* Table Column Widths */
-.col-strategy { width: 25%; }
-.col-type { width: 12%; }
-.col-value { width: 15%; }
-.col-positions { width: 10%; }
-.col-return-1d { width: 12%; }
-.col-return-total { width: 12%; }
-.col-status { width: 10%; }
+.col-strategy { width: 60%; }
+.col-return-1d { width: 20%; }
+.col-return-total { width: 20%; }
 
-.col-ticker { width: 12%; }
-.col-quantity { width: 12%; }
-.col-price { width: 12%; }
-.col-amount { width: 15%; }
-.col-weight { width: 12%; }
-.col-pnl { width: 15%; }
+.col-ticker { width: 20%; }
+.col-amount { width: 25%; }
+.col-nav { width: 20%; }
 
 /* Status indicators */
 .status-badge {

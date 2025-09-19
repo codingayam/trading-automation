@@ -60,6 +60,7 @@ class DataProcessor:
     def __init__(self):
         """Initialize Data Processing Engine."""
         # Initialize API clients
+        self.settings = settings
         self.quiver_client = QuiverClient()
         self.alpaca_client = AlpacaClient()
         self.market_data_service = MarketDataService()
@@ -68,7 +69,7 @@ class DataProcessor:
         # Configuration
         self.max_concurrent_requests = 5
         self.processing_timeout = 300  # 5 minutes
-        self.backup_enabled = settings.database.backup_enabled
+        self.backup_enabled = self.settings.database.backup_enabled
         
         # State tracking
         self.last_processing_time = None
@@ -108,10 +109,10 @@ class DataProcessor:
                 logger.info("Step 1: Fetching congressional trades")
                 congressional_trades = self._fetch_congressional_trades(target_date)
                 
-                # Step 2: Process trades for each agent
-                logger.info("Step 2: Processing trades for agents")
-                processed_trades = self._process_agent_trades(congressional_trades, target_date)
-                
+                # Step 2: Agent execution handled by dedicated agent workflows
+                logger.info("Step 2: Skipping legacy direct trade execution (handled by agent workflows)")
+                processed_trades = 0
+
                 # Step 3: Synchronize portfolios
                 logger.info("Step 3: Synchronizing portfolios")
                 self._synchronize_portfolios()
@@ -145,7 +146,7 @@ class DataProcessor:
         except Exception as e:
             execution_time = time.time() - start_time
             error_msg = f"Daily data processing failed: {e}"
-            logger.error(error_msg, exc_info=True)
+            logger.error(error_msg, exception=e)
             
             self._update_processing_stats(False, execution_time, 0)
             
@@ -195,7 +196,7 @@ class DataProcessor:
             logger.info("No congressional trades to process")
             return 0
         
-        enabled_agents = settings.get_enabled_agents()
+        enabled_agents = self.settings.get_enabled_agents()
         total_processed = 0
         
         for agent_config in enabled_agents:
@@ -253,7 +254,7 @@ class DataProcessor:
                 
                 # Calculate trade size
                 trade_amount = self._calculate_trade_amount(trade)
-                if trade_amount < settings.trading.minimum_amount:
+                if trade_amount < self.settings.trading.minimum_amount:
                     logger.info(f"Trade amount ${trade_amount} below minimum for {trade.ticker}")
                     continue
                 
@@ -290,7 +291,7 @@ class DataProcessor:
             Amount in dollars to trade
         """
         # For MVP, use minimum viable amount or fixed percentage of trade
-        min_amount = settings.trading.minimum_amount
+        min_amount = self.settings.trading.minimum_amount
         
         # Could implement more sophisticated sizing later
         # For now, just use the minimum amount
@@ -363,7 +364,7 @@ class DataProcessor:
             alpaca_positions = self.alpaca_client.get_all_positions()
             
             # Get enabled agents
-            enabled_agents = settings.get_enabled_agents()
+            enabled_agents = self.settings.get_enabled_agents()
             
             # For each agent, reconcile positions
             for agent_config in enabled_agents:
@@ -495,7 +496,7 @@ class DataProcessor:
             target_date: Date to calculate performance for
         """
         try:
-            enabled_agents = settings.get_enabled_agents()
+            enabled_agents = self.settings.get_enabled_agents()
             
             for agent_config in enabled_agents:
                 agent_id = agent_config['id']
@@ -719,7 +720,7 @@ class DataProcessor:
             List of portfolio snapshots
         """
         if agent_ids is None:
-            agent_ids = [agent['id'] for agent in settings.get_enabled_agents()]
+            agent_ids = [agent['id'] for agent in self.settings.get_enabled_agents()]
         
         snapshots = []
         
