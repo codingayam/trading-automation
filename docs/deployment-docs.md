@@ -1,63 +1,67 @@
 # Railway Deployment Playbook
 
-This folder contains the infrastructure-as-code definition for Railway along with the automation hook that applies Prisma migrations during deploys.
+This guide captures the agreed Railway workflow for the Congress‑Mirror project. Two application services live in the monorepo (`apps/web`, `apps/worker`), each with its own `railway.json` config-as-code file. Railway reconciles those files on every deploy, so changes stay versioned alongside the app code.
 
 ## Layout
-- `railway.json` – primary manifest consumed by `railway up`.
-- `hooks/postdeploy.sh` – executed after successful builds to ensure Prisma client generation and migrations run before traffic is served.
+- `apps/web/railway.json` – web service config (install/build/start/healthcheck, Prisma pre-deploy).
+- `apps/worker/railway.json` – worker service config (install/build/start, Prisma pre-deploy, cron schedule).
+- Postgres is managed via `railway add -d postgres -s postgres`; no manifest is required because Railway handles the plugin directly.
 
 ## Bootstrapping a Project
-1. Authenticate with Railway: `railway login`.
-2. From the repo root, create or select the project: `railway use --project congress-mirror` (name can be overridden in `railway.json`).
-3. Apply the manifest: `railway up --service web --service worker-open --environment staging`.
-4. Provision the Postgres plugin by running `railway plugins apply --service postgres` if it does not exist automatically.
-5. Confirm the cron schedule is attached to `worker-open` with `railway cron list`. The manifest encodes `30 13,14 * * 1-5` UTC to mirror NYSE opens across DST.
+1. Authenticate: `railway login`.
+2. Link the repo to the project/environment (run from repo root): `railway link -p congress-mirror -e staging` (repeat for `production` when ready).
+3. Ensure the Postgres plugin exists: `railway add -d postgres -s postgres` (no-op if already attached).
+4. Deploy each service from its folder so Railway reads the matching `railway.json`:
+   ```bash
+   railway up -s web         -e staging ./apps/web
+   railway up -s worker-open -e staging ./apps/worker
+   ```
+   `railway up` will create the services if they do not yet exist and sync all settings from the JSON files, including the worker cron (`30 13,14 * * 1-5` UTC).
 
-> **Headless usage:** In CI/CD call `railway up --ci --environment staging` (or `production`) after the pipeline artifacts are built. The command is idempotent and reconciles any drift in service configuration.
+> **CI/CD usage:** GitHub Actions (or another pipeline) should run `railway up --ci -s <service> -e <env> <path>` after lint/test/migration checks pass. The `--ci` flag streams build logs then exits, matching Railway’s docs.
 
-## Build & Start Commands
-- **Web**
+## Build, Start & Cron Definitions
+- **Web (`apps/web/railway.json`)**
   - Install: `pnpm install --frozen-lockfile`
+  - Pre-deploy: `pnpm run prisma:generate`, `pnpm run migrate`
   - Build: `pnpm --filter @trading-automation/web run build`
   - Start: `pnpm --filter @trading-automation/web run start`
   - Healthcheck: `/api/health`
-- **Worker (`worker-open`)**
+- **Worker (`apps/worker/railway.json`)**
   - Install: `pnpm install --frozen-lockfile`
+  - Pre-deploy: `pnpm run prisma:generate`, `pnpm run migrate`
   - Build: `pnpm --filter @trading-automation/worker run build`
   - Start: `pnpm open-job`
-  - Cron: `30 13,14 * * 1-5`
+  - Cron: `30 13,14 * * 1-5` (Railway executes the start command at both UTC times; if a run is still active, the next trigger is skipped, so the worker must complete quickly.)
 
-## Applying Prisma Migrations
-Deploys trigger `deploy/railway/hooks/postdeploy.sh`, which performs:
+## Prisma Migrations
+Both service manifests use `deploy.preDeployCommand` to run:
 1. `pnpm install --frozen-lockfile`
 2. `pnpm run prisma:generate`
 3. `pnpm run migrate`
 
-If any step fails the deploy aborts. The script is safe to re-run and can be executed manually for diagnostics:
+These commands execute between build and start. Any failure aborts the deploy, ensuring schema drift is caught before traffic shifts.
+
+## Environment Variables & Secrets
+Use config-as-code for non-secret defaults and the CLI for secrets. Example:
 
 ```bash
-./deploy/railway/hooks/postdeploy.sh
+railway variables -e staging -s worker-open --set "DATABASE_URL=postgresql://..."
+railway variables -e staging -s web         --set "ALPACA_KEY_ID=..."
+railway variables -e staging -s web         --set "ALPACA_SECRET_KEY=..."
 ```
 
-## Environment Variables
-The manifest defines variable groups used across environments:
-- `shared-db` – Prisma pool settings.
-- `alpaca` – API base URLs (keys are injected per-environment in Railway).
-- `quiver` – Base URL override.
-- `web-only` – Web-specific public config.
-- `worker-only` – Worker guardrails (`TRADE_NOTIONAL_USD`, caps).
-
-Secrets (`ALPACA_KEY_ID`, `ALPACA_SECRET_KEY`, `QUIVER_API_KEY`, `DATABASE_URL`, etc.) are **not** committed. Set them via `railway variables set --environment <env> <key>=<value>` or the dashboard. See `docs/operations.md` for the rotation checklist.
+- Include the same keys in the production environment once staging validation is complete.
+- Rotate values via `railway variables` or the dashboard; see `docs/operations.md` for the full procedure.
 
 ## Dry-Run Verification
-For staging smoke tests after a deploy:
-1. Set `TRADING_ENABLED=false` and `PAPER_TRADING=true` in the staging environment.
-2. Trigger the worker manually using `railway run worker-open -- pnpm open-job -- --dry-run`.
-3. Inspect logs with `railway logs --service worker-open` to confirm Alpaca clock/calendar gating works.
-4. Navigate to the staging web domain and confirm the dashboard renders using live Alpaca paper positions.
+1. In staging, set `TRADING_ENABLED=false` and `PAPER_TRADING=true` so trades do not fire.
+2. Trigger the worker manually: `railway run -s worker-open -e staging -- pnpm open-job -- --dry-run`.
+3. Review worker logs: `railway logs -s worker-open -e staging` to confirm Alpaca clock/calendar gating and once-per-day skip behavior.
+4. Open the staging domain to ensure the dashboard renders and calls succeed.
 
-## Rollback Strategy
-- Database schema: use `pnpm migrate:dev` locally to craft fix-forward migrations. The Postgres plugin retains physical backups; request a point-in-time restore from the Railway dashboard if an irreversible migration lands.
-- Application: `railway deploy --service web --rollback` (or `worker-open`) restores the previous container image.
+## Rollback Expectations
+- **Application code:** Use the Railway dashboard (Deployments tab → three-dot menu → Rollback) to revert to a previous container image. The CLI does not expose `deploy --rollback`.
+- **Database:** If a migration misfires, craft a fix-forward migration or request a point-in-time restore from Railway Postgres support. Do **not** manually edit schema in production.
 
-See `docs/operations.md` for expanded incident response procedures.
+See `docs/operations.md` for incident handling, cron troubleshooting, and release checklists.

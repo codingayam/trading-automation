@@ -1,0 +1,15 @@
+{
+  "$schema": "https://schema.railway.com/railway.schema.json",
+  "installCommand": "pnpm install --frozen-lockfile",
+  "buildCommand": "pnpm --filter @trading-automation/worker run build",
+  "startCommand": "pnpm open-job",
+  "deploy": {
+    "regions": ["us-east-1"],
+    "restartPolicy": "ON_FAILURE",
+    "cronSchedule": "30 13,14 * * 1-5",
+    "preDeployCommand": [
+      "pnpm run prisma:generate",
+      "pnpm run migrate"
+    ]
+  }
+}

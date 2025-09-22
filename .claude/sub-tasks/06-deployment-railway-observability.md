@@ -38,7 +38,7 @@ Operationalize the system on Railway with separate web and worker services, cron
 - Provides feedback loop to Groups 03–04 on operational metrics for continuous improvements.
 
 ## Status – 2025-09-22
-- ✅ Added `deploy/railway/railway.json` manifest plus executable post-deploy hook so `railway up` provisions the web + worker services, Postgres plugin, and runs Prisma migrations automatically.
-- ✅ Authored `deploy/railway/README.md` covering bootstrap commands, cron verification, dry-run testing, and rollback guidance aligned with the PRD.
+- ✅ Added service-scoped Railway manifests (`apps/web/railway.json`, `apps/worker/railway.json`) with pre-deploy Prisma automation, start commands, and the worker cron schedule for config-as-code parity with Railway guidance.
+- ✅ Documented the deployment workflow in `docs/deployment-docs.md`, including CLI bootstrap steps, cron behaviour, dry-run testing, and rollback expectations.
 - ✅ Published `docs/operations.md` runbook detailing on-call expectations, secrets rotation checklist, incident playbooks (cron misses, migration failures, third-party outages), and deployment verification steps.
 - ✅ Updated `docs/development-workflow.md` to point teams at the new Railway IaC workflow and migration automation prior to release handoff.
