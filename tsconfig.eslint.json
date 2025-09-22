@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "include": [
+    "apps/*/src/**/*",
+    "apps/*/app/**/*",
+    "apps/web/next-env.d.ts",
+    "packages/**/*",
+    "*.ts",
+    "*.tsx"
+  ]
+}

@@ -1,0 +1,124 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_DATABASE_URL")
+}
+
+enum CongressTradeTransaction {
+  BUY
+  SELL
+  UNKNOWN
+}
+
+enum CongressParty {
+  DEMOCRAT
+  REPUBLICAN
+  INDEPENDENT
+  OTHER
+  UNKNOWN
+}
+
+enum TradeSide {
+  BUY
+}
+
+enum TradeOrderType {
+  MARKET
+}
+
+enum TradeTimeInForce {
+  DAY
+}
+
+enum TradeStatus {
+  NEW
+  ACCEPTED
+  PARTIALLY_FILLED
+  FILLED
+  CANCELED
+  REJECTED
+  FAILED
+}
+
+enum JobRunType {
+  OPEN_JOB
+}
+
+enum JobRunStatus {
+  PENDING
+  RUNNING
+  SUCCESS
+  FAILED
+}
+
+model CongressTradeFeed {
+  id          String                  @id @default(uuid())
+  ticker      String
+  memberName  String                  @map("member_name")
+  transaction CongressTradeTransaction
+  tradeDate   DateTime                @map("trade_date")
+  filingDate  DateTime                @map("filing_date")
+  party       CongressParty?
+  rawJson     Json                    @map("raw_json")
+  ingestedAt  DateTime                @default(now()) @map("ingested_at")
+  trades      Trade[]
+
+  @@map("congress_trade_feed")
+  @@index([ticker], map: "congress_trade_feed_ticker_idx")
+  @@index([filingDate], map: "congress_trade_feed_filing_date_idx")
+}
+
+model Trade {
+  id                   String            @id @default(uuid())
+  sourceHash           String            @unique @map("source_hash")
+  clientOrderId        String?           @map("client_order_id")
+  alpacaOrderId        String?           @unique @map("alpaca_order_id")
+  symbol               String
+  side                 TradeSide         @default(BUY)
+  orderType            TradeOrderType    @default(MARKET) @map("order_type")
+  timeInForce          TradeTimeInForce  @default(DAY) @map("time_in_force")
+  notionalSubmitted    Decimal?          @map("notional_submitted") @db.Decimal(18, 2)
+  qtySubmitted         Decimal?          @map("qty_submitted") @db.Decimal(18, 6)
+  filledQty            Decimal?          @map("filled_qty") @db.Decimal(18, 6)
+  filledAvgPrice       Decimal?          @map("filled_avg_price") @db.Decimal(18, 6)
+  status               TradeStatus       @default(NEW)
+  createdAt            DateTime          @default(now()) @map("created_at")
+  submittedAt          DateTime?         @map("submitted_at")
+  updatedAt            DateTime          @default(now()) @updatedAt @map("updated_at")
+  filledAt             DateTime?         @map("filled_at")
+  canceledAt           DateTime?         @map("canceled_at")
+  failedAt             DateTime?         @map("failed_at")
+  rawOrderJson         Json?             @map("raw_order_json")
+  congressTradeFeedId  String?           @map("congress_trade_feed_id")
+  congressTradeFeed    CongressTradeFeed? @relation(fields: [congressTradeFeedId], references: [id])
+
+  @@map("trade")
+  @@index([clientOrderId], map: "trade_client_order_id_idx")
+}
+
+model JobRun {
+  id             String        @id @default(uuid())
+  type           JobRunType     @default(OPEN_JOB)
+  tradingDateEt  DateTime      @map("trading_date_et") @db.Date
+  status         JobRunStatus   @default(PENDING)
+  startedAt      DateTime?     @map("started_at")
+  finishedAt     DateTime?     @map("finished_at")
+  summaryJson    Json?         @map("summary_json")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @default(now()) @updatedAt @map("updated_at")
+
+  @@map("job_run")
+  @@unique([type, tradingDateEt], map: "job_run_type_trading_date_et_key")
+}
+
+model IngestCheckpoint {
+  tradingDateEt            DateTime @id @map("trading_date_et") @db.Date
+  lastFiledTsProcessedEt   DateTime? @map("last_filed_ts_processed_et")
+  updatedAt                DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  @@map("ingest_checkpoint")
+}

@@ -1,0 +1,40 @@
+{
+  "name": "trading-automation",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm --filter @trading-automation/web dev",
+    "build": "pnpm --filter @trading-automation/* run build",
+    "lint": "pnpm --filter @trading-automation/* run lint",
+    "test": "pnpm --filter @trading-automation/* run test",
+    "open-job": "pnpm --filter @trading-automation/worker open-job",
+    "migrate": "prisma migrate deploy --schema packages/shared/prisma/schema.prisma",
+    "migrate:dev": "prisma migrate dev --schema packages/shared/prisma/schema.prisma",
+    "prisma:generate": "PRISMA_GENERATE_SKIP_AUTOINSTALL=1 prisma generate --schema packages/shared/prisma/schema.prisma",
+    "seed": "pnpm exec tsx packages/shared/prisma/seed.ts",
+    "format": "prettier --check .",
+    "format:write": "prettier --write ."
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.30",
+    "@typescript-eslint/eslint-plugin": "^7.6.0",
+    "@typescript-eslint/parser": "^7.6.0",
+    "@prisma/internals": "6.16.2",
+    "eslint": "^8.57.0",
+    "eslint-config-next": "^14.1.0",
+    "eslint-config-prettier": "^9.1.0",
+    "prettier": "^3.2.5",
+    "prisma": "6.16.2",
+    "prismock": "^1.35.4",
+    "tsx": "^4.7.1",
+    "typescript": "^5.4.2",
+    "vitest": "^1.5.0"
+  },
+  "dependencies": {
+    "@prisma/client": "6.16.2"
+  },
+  "prisma": {
+    "seed": "pnpm exec tsx packages/shared/prisma/seed.ts"
+  }
+}
