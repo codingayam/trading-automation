@@ -1,0 +1,29 @@
+[
+  {
+    "Ticker": "MSFT",
+    "Name": "Rep. Chris Lee",
+    "Transaction": "Sale",
+    "Filed": "2024-02-16",
+    "Traded": "2024-02-15",
+    "Party": "D",
+    "Amount": "$1,001 - $15,000"
+  },
+  {
+    "Ticker": "",
+    "Name": "Rep. Pat Gomez",
+    "Transaction": "Purchase",
+    "Filed": "2024-02-16",
+    "Party": "R",
+    "Amount": "$1,001 - $15,000",
+    "Notes": "Ticker missing to exercise validation"
+  },
+  {
+    "Ticker": "TSLA",
+    "Name": "Rep. Morgan Hill",
+    "Transaction": "Purchase",
+    "Filed": "2024-02-16",
+    "Traded": "2024-02-16",
+    "Party": "D",
+    "Amount": "$1,001 - $15,000"
+  }
+]

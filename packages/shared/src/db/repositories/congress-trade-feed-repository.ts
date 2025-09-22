@@ -9,6 +9,7 @@ import { resolveClient, type TransactionClient } from '../transactions';
 import { rethrowKnownPrismaErrors } from '../prisma-errors';
 
 export interface CreateFeedEntryParams {
+  id?: string;
   ticker: string;
   memberName: string;
   transaction: CongressTradeTransaction;
@@ -31,14 +32,15 @@ export class CongressTradeFeedRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
   async create(params: CreateFeedEntryParams): Promise<CongressTradeFeed> {
-    const { tx, ...data } = params;
+    const { tx, id, ingestedAt, ...data } = params;
     const client = resolveClient(this.prisma, tx);
 
     try {
       return await client.congressTradeFeed.create({
         data: {
+          id: id ?? undefined,
           ...data,
-          ingestedAt: data.ingestedAt ?? new Date(),
+          ingestedAt: ingestedAt ?? new Date(),
         },
       });
     } catch (error) {
@@ -54,7 +56,8 @@ export class CongressTradeFeedRepository {
     const client = resolveClient(this.prisma, tx);
     try {
       await client.congressTradeFeed.createMany({
-        data: entries.map(({ tx: _tx, ingestedAt, ...entry }) => ({
+        data: entries.map(({ tx: _tx, ingestedAt, id, ...entry }) => ({
+          id: id ?? undefined,
           ...entry,
           ingestedAt: ingestedAt ?? new Date(),
         })),
@@ -95,6 +98,11 @@ export class CongressTradeFeedRepository {
     });
 
     return latest?.filingDate ?? null;
+  }
+
+  async findById(id: string, tx?: TransactionClient): Promise<CongressTradeFeed | null> {
+    const client = resolveClient(this.prisma, tx);
+    return client.congressTradeFeed.findUnique({ where: { id } });
   }
 }
 

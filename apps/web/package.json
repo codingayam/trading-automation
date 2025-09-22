@@ -12,6 +12,8 @@
   },
   "dependencies": {
     "@trading-automation/shared": "workspace:*",
+    "recharts": "^2.11.0",
+    "zod": "^3.22.4",
     "next": "^14.1.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
@@ -19,6 +21,10 @@
   "devDependencies": {
     "@types/react": "^18.2.66",
     "@types/react-dom": "^18.2.20",
+    "@testing-library/jest-dom": "^6.4.2",
+    "@testing-library/react": "^14.2.1",
+    "@testing-library/user-event": "^14.5.2",
+    "jsdom": "^24.0.0",
     "typescript": "^5.4.2"
   }
 }

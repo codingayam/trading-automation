@@ -1,0 +1,10 @@
+{
+  "code": 42210000,
+  "message": "invalid notional: fractional trading is not enabled for this asset",
+  "data": [
+    {
+      "field": "notional",
+      "message": "Fractional market orders are not supported for NVDA"
+    }
+  ]
+}

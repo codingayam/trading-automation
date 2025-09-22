@@ -36,3 +36,15 @@ Implement the Next.js dashboard pages and supporting API routes that surface liv
 ## Handoffs & Integration Points
 - Consumes outputs from Groups 02–04; coordinate on API contracts and repository exposures.
 - Provides observable metrics (front-end logs) to Group 06 for inclusion in operational dashboards.
+
+## Status – 2025-09-22
+- ✅ `/overview`, `/trades`, and `/positions` routes/pages implemented with shared env + repository wiring and offline Alpaca fallback.
+- ✅ Shared UI kit (`MetricCard`, `StatusBadge`, `DataTable`) and chart component (Recharts) powering portfolio + table visuals.
+- ✅ API rate limiting + zod validation guards, Prisma-backed trade pagination, and Alpaca dependency injection helpers.
+- ✅ Vitest coverage using React Testing Library + Prismock-backed API integration specs (`apps/web/app/api/**/*.test.ts`).
+- ⚠️ `pnpm install` required to pick up newly added `recharts`, `zod`, `jsdom`, and Testing Library dev deps before running `pnpm --filter @trading-automation/web test`.
+- 🚧 Recommend a quick Lighthouse pass once styles stabilise; no blocking issues observed during manual checks.
+
+## Follow-ups
+- Coordinate with Group 06 to surface API rate-limit metrics and ensure Railway envs provide Alpaca credentials for the web service.
+- Consider lightweight client-side polling for `/positions` if near-real-time refresh is required beyond the current ISR window.

@@ -1,0 +1,106 @@
+{
+  "$schema": "https://schema.railway.com/railway.schema.json",
+  "project": "congress-mirror",
+  "plugins": [
+    {
+      "name": "postgres",
+      "type": "postgresql",
+      "version": "15"
+    }
+  ],
+  "environments": [
+    {
+      "name": "staging",
+      "services": [
+        "web",
+        "worker-open"
+      ],
+      "variables": {
+        "NODE_ENV": "production",
+        "SERVICE_NAME": "congress-mirror-staging",
+        "LOG_LEVEL": "info",
+        "PAPER_TRADING": "true",
+        "TRADING_ENABLED": "false",
+        "NEXT_PUBLIC_REVALIDATE_SECONDS": "60"
+      }
+    },
+    {
+      "name": "production",
+      "services": [
+        "web",
+        "worker-open"
+      ],
+      "variables": {
+        "NODE_ENV": "production",
+        "SERVICE_NAME": "congress-mirror",
+        "LOG_LEVEL": "info",
+        "PAPER_TRADING": "false",
+        "TRADING_ENABLED": "true",
+        "NEXT_PUBLIC_REVALIDATE_SECONDS": "300"
+      }
+    }
+  ],
+  "services": [
+    {
+      "name": "web",
+      "rootDirectory": ".",
+      "installCommand": "pnpm install --frozen-lockfile",
+      "buildCommand": "pnpm --filter @trading-automation/web run build",
+      "startCommand": "pnpm --filter @trading-automation/web run start",
+      "healthcheckPath": "/api/health",
+      "envVarGroups": [
+        "shared-db",
+        "alpaca",
+        "quiver",
+        "web-only"
+      ],
+      "deploy": {
+        "regions": ["us-east-1"],
+        "numReplicas": 1,
+        "restartPolicy": "ON_FAILURE",
+        "postDeploy": [
+          {
+            "name": "apply-prisma-migrations",
+            "command": "./deploy/railway/hooks/postdeploy.sh"
+          }
+        ]
+      }
+    },
+    {
+      "name": "worker-open",
+      "rootDirectory": ".",
+      "installCommand": "pnpm install --frozen-lockfile",
+      "buildCommand": "pnpm --filter @trading-automation/worker run build",
+      "startCommand": "pnpm open-job",
+      "envVarGroups": [
+        "shared-db",
+        "alpaca",
+        "quiver",
+        "worker-only"
+      ],
+      "cronSchedule": "30 13,14 * * 1-5",
+      "restartPolicy": "ON_FAILURE"
+    }
+  ],
+  "variables": {
+    "shared-db": {
+      "DATABASE_POOL_MODE": "transaction",
+      "PRISMA_CONNECTION_LIMIT": "3"
+    },
+    "alpaca": {
+      "ALPACA_BASE_URL": "https://paper-api.alpaca.markets",
+      "ALPACA_DATA_BASE_URL": "https://data.alpaca.markets"
+    },
+    "quiver": {
+      "QUIVER_BASE_URL": "https://api.quiverquant.com/beta"
+    },
+    "web-only": {
+      "NEXT_PUBLIC_API_BASE_URL": "${{RAILWAY_PUBLIC_DOMAIN}}/api"
+    },
+    "worker-only": {
+      "DAILY_MAX_FILINGS": "200",
+      "PER_TICKER_DAILY_MAX": "25",
+      "TRADE_NOTIONAL_USD": "1000"
+    }
+  }
+}

@@ -1,0 +1,235 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
+import { Prisma, PrismaClient } from '@prisma/client';
+import { PrismockClient } from 'prismock';
+import { beforeEach, describe, expect, it, vi, afterEach } from 'vitest';
+
+import {
+  AlpacaClient,
+  AlpacaOrderValidationError,
+  QuiverClient,
+  createLogger,
+  formatDateKey,
+  loadWorkerEnv,
+  type WorkerEnv,
+} from '@trading-automation/shared';
+import * as shared from '@trading-automation/shared';
+
+import { runOpenJob } from '../open-job-runner';
+
+const FIXTURE_ROOT = resolve(__dirname, '../../../../packages/shared/fixtures');
+
+const readFixture = <T>(relativePath: string): T => {
+  const contents = readFileSync(resolve(FIXTURE_ROOT, relativePath), 'utf8');
+  return JSON.parse(contents) as T;
+};
+
+// Prismock relies on Decimal / structuredClone being present just like shared unit tests.
+if (!(globalThis as Record<string, unknown>).Decimal) {
+  (globalThis as Record<string, unknown>).Decimal = Prisma.Decimal;
+}
+
+const originalStructuredClone = globalThis.structuredClone?.bind(globalThis);
+
+const safeClone = (value: unknown): unknown => {
+  if (value instanceof Prisma.Decimal) {
+    return new Prisma.Decimal(value.toString());
+  }
+
+  if (value instanceof Date) {
+    return new Date(value.getTime());
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => safeClone(item));
+  }
+
+  if (value && typeof value === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>).map(([key, item]) => [key, safeClone(item)]);
+    return Object.fromEntries(entries);
+  }
+
+  return value;
+};
+
+(globalThis as Record<string, unknown>).structuredClone = ((input: unknown) => {
+  if (originalStructuredClone) {
+    try {
+      return originalStructuredClone(input);
+    } catch {
+      return safeClone(input);
+    }
+  }
+
+  return safeClone(input);
+}) as typeof structuredClone;
+
+const quiverFixtures: Record<string, unknown[]> = {
+  '2024-02-15': readFixture('quiver/congresstrading-2024-02-15.json'),
+  '2024-02-16': readFixture('quiver/congresstrading-2024-02-16.json'),
+};
+
+const alpacaOrderAcceptedFixture = readFixture<Record<string, unknown>>('alpaca/order-notional-accepted.json');
+const alpacaOrderFilledFixture = readFixture<Record<string, unknown>>('alpaca/order-filled.json');
+const alpacaValidationFixture = readFixture<{ code: number; message: string; data?: Array<{ message: string }> }>(
+  'alpaca/order-validation-422.json',
+);
+const alpacaClockFixture = readFixture<{ timestamp: string; is_open: boolean; next_open: string; next_close: string }>(
+  'alpaca/clock-open.json',
+);
+const alpacaCalendarFixture = readFixture<Array<{ date: string; open: string; close: string; session_open?: string; session_close?: string }>>(
+  'alpaca/calendar-2024-02-16.json',
+);
+const alpacaLatestTradeFixture = readFixture<{ symbol: string; trade: { t: string; price: number; size: number; exchange: string; conditions?: string[] } }>(
+  'alpaca/latest-trade-aapl.json',
+);
+
+const deepClone = <T>(value: T): T => JSON.parse(JSON.stringify(value));
+
+describe('runOpenJob integration (fixtures)', () => {
+  let prisma: PrismaClient;
+  let env: Readonly<WorkerEnv>;
+
+  beforeEach(() => {
+    prisma = new PrismockClient() as unknown as PrismaClient;
+    vi.spyOn(shared, 'getPrismaClient').mockReturnValue(prisma);
+
+    env = loadWorkerEnv({
+      NODE_ENV: 'test',
+      LOG_LEVEL: 'fatal',
+      SERVICE_NAME: 'open-job-worker-test',
+      DATABASE_URL: 'postgresql://test:test@localhost:5432/test',
+      ALPACA_KEY_ID: 'alpaca-key',
+      ALPACA_SECRET_KEY: 'alpaca-secret',
+      QUIVER_API_KEY: 'quiver-key',
+    });
+
+    const calendarResponse = [
+      {
+        date: '2024-02-15',
+        open: '09:30',
+        close: '16:00',
+        session_open: '04:00',
+        session_close: '20:00',
+      },
+      ...alpacaCalendarFixture,
+    ];
+
+    vi.spyOn(AlpacaClient.prototype, 'getClock').mockResolvedValue(deepClone(alpacaClockFixture));
+    vi.spyOn(AlpacaClient.prototype, 'getCalendar').mockImplementation(async () => deepClone(calendarResponse));
+
+    const orderQueues = new Map<string, Array<Record<string, unknown>>>();
+
+    vi.spyOn(AlpacaClient.prototype, 'submitOrder').mockImplementation(async (payload) => {
+      const symbol = payload.symbol;
+      const clientOrderId = payload.client_order_id ?? `auto-${symbol}`;
+
+      if (payload.notional && symbol === 'BRK.B') {
+        throw new AlpacaOrderValidationError(alpacaValidationFixture.message, {
+          status: 422,
+          errorCode: alpacaValidationFixture.code,
+          body: alpacaValidationFixture,
+          violations: alpacaValidationFixture.data?.map((item) => item.message),
+        });
+      }
+
+      if (payload.notional) {
+        const acceptedOrder = {
+          ...deepClone(alpacaOrderAcceptedFixture),
+          id: `order-${symbol}-notional`,
+          client_order_id: clientOrderId,
+          symbol,
+          notional: payload.notional,
+          qty: null,
+        };
+
+        const filledOrder = {
+          ...deepClone(alpacaOrderFilledFixture),
+          id: acceptedOrder.id,
+          client_order_id: clientOrderId,
+          symbol,
+          notional: payload.notional,
+          qty: '5',
+        };
+
+        orderQueues.set(acceptedOrder.id, [acceptedOrder, filledOrder]);
+        return acceptedOrder as typeof alpacaOrderAcceptedFixture;
+      }
+
+      const qtyString = payload.qty ?? '0';
+      const fallbackOrder = {
+        ...deepClone(alpacaOrderFilledFixture),
+        id: `order-${symbol}-fallback`,
+        client_order_id: clientOrderId,
+        symbol,
+        notional: null,
+        qty: qtyString,
+        filled_qty: qtyString,
+        status: 'filled',
+      };
+
+      orderQueues.set(fallbackOrder.id, [fallbackOrder]);
+      return fallbackOrder as typeof alpacaOrderFilledFixture;
+    });
+
+    vi.spyOn(AlpacaClient.prototype, 'getOrder').mockImplementation(async ({ orderId }) => {
+      const queue = orderQueues.get(orderId);
+      if (!queue || queue.length === 0) {
+        throw new Error(`Order ${orderId} not found in mock queue`);
+      }
+
+      const [next, ...rest] = queue;
+      orderQueues.set(orderId, rest);
+      return deepClone(next) as typeof alpacaOrderFilledFixture;
+    });
+
+    vi.spyOn(AlpacaClient.prototype, 'getLatestTrade').mockImplementation(async ({ symbol }) => {
+      const cloned = deepClone(alpacaLatestTradeFixture);
+      cloned.symbol = symbol;
+      return cloned as typeof alpacaLatestTradeFixture;
+    });
+
+    vi.spyOn(QuiverClient.prototype, 'getCongressTradingByDate').mockImplementation(async ({ date }) => {
+      const resolvedDate = date instanceof Date ? formatDateKey(date) : date;
+      const fixture = quiverFixtures[resolvedDate];
+      return fixture ? deepClone(fixture) as Record<string, unknown>[] : [];
+    });
+  });
+
+  afterEach(async () => {
+    vi.restoreAllMocks();
+    await prisma.$disconnect();
+  });
+
+  it('processes Quiver filings and records trades using Alpaca fixtures', async () => {
+    const logger = createLogger({ level: 'fatal' });
+    const now = () => new Date('2024-02-16T14:30:00.000Z');
+
+    const result = await runOpenJob({ env, logger, now });
+
+    expect(result.status).toBe('success');
+    expect(result.summary.trades.submitted).toBe(3);
+    expect(result.summary.trades.fallbackUsed).toBe(1);
+    expect(result.summary.trades.guardrailBlocked).toBe(0);
+    expect(result.summary.errors).toEqual([]);
+
+    const jobRuns = await prisma.jobRun.findMany();
+    expect(jobRuns).toHaveLength(1);
+    expect(jobRuns[0]?.status).toBe('SUCCESS');
+
+    const checkpoints = await prisma.ingestCheckpoint.findMany({ orderBy: { tradingDateEt: 'asc' } });
+    expect(checkpoints).toHaveLength(2);
+
+    const trades = await prisma.trade.findMany({ orderBy: { symbol: 'asc' } });
+    expect(trades).toHaveLength(3);
+
+    const fallbackTrade = trades.find((trade) => trade.symbol === 'BRK.B');
+    expect(fallbackTrade?.notionalSubmitted).toBeNull();
+    expect(fallbackTrade?.qtySubmitted?.toNumber()).toBeGreaterThan(0);
+
+    const feedEntries = await prisma.congressTradeFeed.findMany();
+    expect(feedEntries).toHaveLength(3);
+  });
+});
+

@@ -44,3 +44,4 @@ All workspace scripts are exposed at the root for convenience:
 - Railway web service: `pnpm run build` → `pnpm run start`.
 - Railway worker service: `pnpm run open-job` as the Start Command; the cron remains `30 13,14 * * 1-5` UTC.
 - Before promotion, ensure `pnpm test` and `pnpm lint` pass in CI to satisfy Group 06 handoff.
+- `deploy/railway/railway.json` codifies the infrastructure; apply with `railway up --environment <env>` so services/cron stay in sync. Post-deploy hooks execute Prisma migrations automatically.

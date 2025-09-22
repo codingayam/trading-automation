@@ -1,4 +1,4 @@
-import type { IngestCheckpoint, Prisma, PrismaClient } from '@prisma/client';
+import type { IngestCheckpoint, PrismaClient } from '@prisma/client';
 import { resolveClient, type TransactionClient } from '../transactions';
 import { rethrowKnownPrismaErrors } from '../prisma-errors';
 

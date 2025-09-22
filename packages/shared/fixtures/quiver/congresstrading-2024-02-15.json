@@ -1,0 +1,32 @@
+[
+  {
+    "Ticker": "NVDA",
+    "Name": "Rep. John Doe",
+    "Transaction": "Purchase",
+    "Filed": "2024-02-16",
+    "Traded": "2024-02-15",
+    "Party": "D",
+    "Amount": "$1,001 - $15,000",
+    "District": "CA-16"
+  },
+  {
+    "Ticker": "AAPL",
+    "Name": "Sen. Jane Smith",
+    "Transaction": "Purchase",
+    "Filed": "2024-02-15",
+    "Traded": "2024-02-14",
+    "Party": "R",
+    "Amount": "$15,001 - $50,000",
+    "District": "TX-05"
+  },
+  {
+    "Ticker": "BRK.B",
+    "Name": "Rep. Alex Johnson",
+    "Transaction": "Purchase",
+    "Filed": "2024-02-15",
+    "Traded": "2024-02-15",
+    "Party": "I",
+    "Amount": "$50,001 - $100,000",
+    "Notes": "High priced equity to exercise fallback path"
+  }
+]

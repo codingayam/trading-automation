@@ -6,6 +6,8 @@
   "include": [
     "apps/*/src/**/*",
     "apps/*/app/**/*",
+    "apps/*/components/**/*",
+    "apps/*/lib/**/*",
     "apps/web/next-env.d.ts",
     "packages/**/*",
     "*.ts",

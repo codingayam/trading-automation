@@ -45,10 +45,28 @@ describe('environment loader', () => {
   });
 
   it('parses shared env without requiring service-specific vars', () => {
-    const env = loadSharedEnv({ NODE_ENV: 'development' });
+    const previousKey = process.env.ALPACA_KEY_ID;
+    const previousSecret = process.env.ALPACA_SECRET_KEY;
 
-    expect(env.TRADE_NOTIONAL_USD).toBe(1000);
-    expect(env.ALPACA_BASE_URL).toBe('https://paper-api.alpaca.markets');
+    delete process.env.ALPACA_KEY_ID;
+    delete process.env.ALPACA_SECRET_KEY;
+
+    try {
+      const env = loadSharedEnv({ NODE_ENV: 'development' });
+
+      expect(env.TRADE_NOTIONAL_USD).toBe(1000);
+      expect(env.ALPACA_BASE_URL).toBe('https://paper-api.alpaca.markets');
+      expect(env.ALPACA_KEY_ID).toBeUndefined();
+      expect(env.ALPACA_SECRET_KEY).toBeUndefined();
+    } finally {
+      if (previousKey !== undefined) {
+        process.env.ALPACA_KEY_ID = previousKey;
+      }
+
+      if (previousSecret !== undefined) {
+        process.env.ALPACA_SECRET_KEY = previousSecret;
+      }
+    }
   });
 
   it('parses web env and applies defaults', () => {

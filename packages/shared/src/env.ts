@@ -225,6 +225,10 @@ const workerSchema = baseSchema.extend({
     .string()
     .url('ALPACA_BASE_URL must be a valid URL')
     .default('https://paper-api.alpaca.markets'),
+  ALPACA_DATA_BASE_URL: z
+    .string()
+    .url('ALPACA_DATA_BASE_URL must be a valid URL')
+    .default('https://data.alpaca.markets'),
   QUIVER_API_KEY: z.string().min(1, 'QUIVER_API_KEY is required'),
   QUIVER_BASE_URL: z
     .string()
@@ -260,10 +264,16 @@ const sharedSchema = baseSchema.extend({
   PRISMA_CONNECTION_LIMIT: optionalNumberFromEnv({ int: true, positive: true }),
   PRISMA_POOL_TIMEOUT_MS: optionalNumberFromEnv({ int: true, positive: true }),
   PRISMA_LOG_QUERIES: booleanFromEnv(false),
+  ALPACA_KEY_ID: z.string().min(1).optional(),
+  ALPACA_SECRET_KEY: z.string().min(1).optional(),
   ALPACA_BASE_URL: z
     .string()
     .url('ALPACA_BASE_URL must be a valid URL')
     .default('https://paper-api.alpaca.markets'),
+  ALPACA_DATA_BASE_URL: z
+    .string()
+    .url('ALPACA_DATA_BASE_URL must be a valid URL')
+    .default('https://data.alpaca.markets'),
   TRADE_NOTIONAL_USD: numberFromEnv({ defaultValue: 1000, positive: true }),
 });
 

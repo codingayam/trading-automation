@@ -1,5 +1,30 @@
 # Group 03 – Alpaca Integration / Trade Support
 
+## Status
+- ✅ Typed Alpaca REST client with authenticated requests, response parsing, and error mapping for validation/buying power cases
+- ✅ `submitTradeForFiling` orchestration covers notional submission, whole-share fallback, guardrails, and polling persistence
+- ✅ Risk guardrail enforcement wired to env toggles with structured logging + repository-backed counts
+- ✅ Vitest coverage across success, fallback, guardrail block, and insufficient buying power paths
+- ✅ `TradeRepository` extended with window counting + Decimal null handling for reconciliation updates
+
+## Key Deliverables
+- `packages/shared/src/alpaca/client.ts:1` – resilient Alpaca client sharing orders, account, positions, and latest trade lookups with retry-aware error translation
+- `packages/shared/src/alpaca/trade-support.ts:1` – `submitTradeForFiling` transactionally evaluates guardrails, records trades, handles fallback, propagates actionable errors, and triggers status polling
+- `packages/shared/src/alpaca/polling.ts:1` – exponential backoff polling loop updating trades until terminal statuses or timeout
+- `packages/shared/src/alpaca/guardrails.ts:1` – guard evaluation utilities emitting structured logs + throwable guardrail errors
+- `packages/shared/src/alpaca/types.ts:1` & `packages/shared/src/alpaca/status.ts:1` – shared typing + status mapping consumed by worker and dashboards
+- `packages/shared/src/db/repositories/trade-repository.ts:17` – new `countTradesInWindow` helper and Decimal coercion tweaks supporting guard counts + fallback nullification
+- Env surface extended with `ALPACA_DATA_BASE_URL` (`packages/shared/src/env.ts:215`, `.env.example:12`) to target market data API for fallback pricing
+- Fixture pack under `packages/shared/fixtures/` with canonical Alpaca + Quiver payloads for worker integration tests
+
+## Testing
+- `pnpm --filter @trading-automation/shared test` (Vitest) exercises Alpaca trade support happy path, fallback, guardrail disablement, and insufficient buying power failure using Prismock-backed repositories
+
+## Follow-ups
+- [ ] Align with Group 04 on worker wiring (e.g., provide trading window boundaries + logger injection) and end-to-end job orchestration
+- [ ] Evaluate rate-limit handling once Alpaca sandbox connectivity is available; extend client retry policy if real responses surface additional codes
+- [ ] Consider capturing Alpaca `request_id` when moving off `httpFetch` to aid production diagnostics
+
 ## Objective
 Build a resilient Alpaca client and trading support layer that submits notional orders, applies guardrails, and reconciles fill status as defined in the PRD.
 

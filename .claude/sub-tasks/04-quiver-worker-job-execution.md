@@ -37,3 +37,10 @@ Deliver the end-to-end worker responsible for ingesting Quiver filings at market
 ## Handoffs & Integration Points
 - Produces DB data consumed by Group 05’s dashboard.
 - Shares run summaries with Group 06 for alerting/operational dashboards.
+
+## Status – 2025-09-29
+- ✅ Implemented `runOpenJob` orchestrator: Alpaca clock/calendar gating, Quiver ingestion windows, guardrail-aware trade submission, and checkpoint updates with structured summaries.
+- ✅ Added shared Quiver client alongside Eastern-time utility helpers; worker now supports `--dry-run` CLI flag for local QA without Alpaca side effects.
+- ✅ Job run + ingest checkpoint repositories receive deterministic source hashes (feed id = source hash) and summaryJson reflects filings/trade outcomes for alerting.
+- ✅ Vitest coverage extended for the new time helpers, and shared lint/test suites run clean (`pnpm --filter @trading-automation/shared test`).
+- ✅ Added worker integration test harness stubbing Alpaca + Quiver via shared fixtures, ensuring end-to-end orchestration with Prismock.

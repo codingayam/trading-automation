@@ -8,7 +8,7 @@ export default defineConfig({
   root: rootDir,
   test: {
     globals: true,
-    environment: 'node',
+    environment: 'jsdom',
     include: [
       'packages/shared/src/**/*.test.ts',
       'apps/worker/src/**/*.test.ts',

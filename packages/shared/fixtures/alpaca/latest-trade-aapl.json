@@ -1,0 +1,10 @@
+{
+  "symbol": "AAPL",
+  "trade": {
+    "t": "2024-02-16T14:32:10.123Z",
+    "price": 189.42,
+    "size": 100,
+    "exchange": "V",
+    "conditions": ["@", "T"]
+  }
+}

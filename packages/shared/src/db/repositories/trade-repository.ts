@@ -13,8 +13,12 @@ import { rethrowKnownPrismaErrors } from '../prisma-errors';
 
 type DecimalInput = PrismaNamespace.Decimal | number | string | null | undefined;
 
-const toDecimal = (value: DecimalInput): PrismaNamespace.Decimal | undefined => {
-  if (value === null || value === undefined || value === '') {
+const toDecimal = (value: DecimalInput): PrismaNamespace.Decimal | null | undefined => {
+  if (value === null) {
+    return null;
+  }
+
+  if (value === undefined || value === '') {
     return undefined;
   }
 
@@ -67,6 +71,30 @@ export interface UpsertTradeParams {
 export interface ListOpenTradesParams {
   statuses?: TradeStatus[];
   limit?: number;
+  tx?: TransactionClient;
+}
+
+export interface ListTradesParams {
+  page?: number;
+  pageSize?: number;
+  symbol?: string;
+  startDate?: Date;
+  endDate?: Date;
+  order?: 'asc' | 'desc';
+  tx?: TransactionClient;
+}
+
+export interface ListTradesResult {
+  trades: Trade[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface CountTradesInWindowParams {
+  windowStart: Date;
+  windowEnd: Date;
+  symbol?: string;
   tx?: TransactionClient;
 }
 
@@ -168,6 +196,52 @@ export class TradeRepository {
       },
       orderBy: { createdAt: 'asc' },
       take: limit,
+    });
+  }
+
+  async listTrades(params: ListTradesParams = {}): Promise<ListTradesResult> {
+    const { page = 1, pageSize = 20, symbol, startDate, endDate, order = 'desc', tx } = params;
+    const client = resolveClient(this.prisma, tx);
+
+    const currentPage = Math.max(page, 1);
+    const take = Math.min(Math.max(pageSize, 1), 100);
+    const skip = (currentPage - 1) * take;
+
+    const where: Prisma.TradeWhereInput = {
+      symbol: symbol ? { equals: symbol.trim().toUpperCase() } : undefined,
+      createdAt: startDate || endDate ? { gte: startDate, lte: endDate } : undefined,
+    };
+
+    const [trades, total] = await Promise.all([
+      client.trade.findMany({
+        where,
+        orderBy: { createdAt: order },
+        skip,
+        take,
+      }),
+      client.trade.count({ where }),
+    ]);
+
+    return {
+      trades,
+      total,
+      page: currentPage,
+      pageSize: take,
+    };
+  }
+
+  async countTradesInWindow(params: CountTradesInWindowParams): Promise<number> {
+    const { windowStart, windowEnd, symbol, tx } = params;
+    const client = resolveClient(this.prisma, tx);
+
+    return client.trade.count({
+      where: {
+        createdAt: {
+          gte: windowStart,
+          lt: windowEnd,
+        },
+        symbol: symbol ? { equals: symbol } : undefined,
+      },
     });
   }
 
