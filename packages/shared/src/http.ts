@@ -1,5 +1,5 @@
-import { HttpRequestError } from './errors';
-import type { Logger } from './logger';
+import { HttpRequestError } from './errors.js';
+import type { Logger } from './logger.js';
 
 const DEFAULT_RETRY_STATUS = [408, 425, 429, 500, 502, 503, 504];
 

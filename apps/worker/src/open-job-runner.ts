@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 
-import type { CongressParty, CongressTradeTransaction } from '@prisma/client';
+import type { CongressParty, CongressTradeTransaction, Prisma } from '@prisma/client';
 
 import {
   AlpacaClient,
@@ -182,6 +182,8 @@ const buildSourceHash = (name: string, ticker: string, filed: Date, transaction:
   const raw = `${name}|${ticker}|${filedKey}|${transaction}`;
   return createHash('sha256').update(raw).digest('hex');
 };
+
+const toInputJsonValue = (value: unknown): Prisma.InputJsonValue => value as Prisma.InputJsonValue;
 
 const parseCalendarTime = (date: string, time: string | null | undefined): Date => {
   const safeTime = (time ?? '09:30').trim();
@@ -569,7 +571,7 @@ export const runOpenJob = async (options: RunOpenJobOptions): Promise<RunOpenJob
           tradeDate: candidate.tradeDate,
           filingDate: candidate.filingDate,
           party: candidate.party,
-          rawJson: candidate.raw,
+          rawJson: toInputJsonValue(candidate.raw),
         });
       } catch (error) {
         if (error instanceof UniqueConstraintViolationError) {
@@ -673,14 +675,14 @@ export const runOpenJob = async (options: RunOpenJobOptions): Promise<RunOpenJob
     });
 
     if (errors.length > 0 || tradeSummary.failures > 0) {
-      await jobRunRepository.fail({ tradingDateEt, summaryJson: summary });
+      await jobRunRepository.fail({ tradingDateEt, summaryJson: toInputJsonValue(summary) });
       return {
         status: 'failed',
         summary,
       };
     }
 
-    await jobRunRepository.complete({ tradingDateEt, summaryJson: summary });
+    await jobRunRepository.complete({ tradingDateEt, summaryJson: toInputJsonValue(summary) });
 
     return {
       status: 'success',
@@ -705,7 +707,7 @@ export const runOpenJob = async (options: RunOpenJobOptions): Promise<RunOpenJob
       errors,
     });
 
-    await jobRunRepository.fail({ tradingDateEt, summaryJson: summary });
+    await jobRunRepository.fail({ tradingDateEt, summaryJson: toInputJsonValue(summary) });
 
     return {
       status: 'failed',

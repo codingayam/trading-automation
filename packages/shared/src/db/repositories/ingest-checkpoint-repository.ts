@@ -1,6 +1,6 @@
 import type { IngestCheckpoint, PrismaClient } from '@prisma/client';
-import { resolveClient, type TransactionClient } from '../transactions';
-import { rethrowKnownPrismaErrors } from '../prisma-errors';
+import { resolveClient, type TransactionClient } from '../transactions.js';
+import { rethrowKnownPrismaErrors } from '../prisma-errors.js';
 
 export interface UpsertCheckpointParams {
   tradingDateEt: Date;
@@ -33,6 +33,7 @@ export class IngestCheckpointRepository {
       });
     } catch (error) {
       rethrowKnownPrismaErrors(error, 'Duplicate ingest checkpoint detected');
+      throw error;
     }
   }
 
@@ -42,6 +43,7 @@ export class IngestCheckpointRepository {
       return await client.ingestCheckpoint.delete({ where: { tradingDateEt } });
     } catch (error) {
       rethrowKnownPrismaErrors(error, 'Duplicate ingest checkpoint detected');
+      throw error;
     }
   }
 

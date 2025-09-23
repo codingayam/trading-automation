@@ -1,6 +1,6 @@
 import type { JobRun, JobRunStatus, JobRunType, Prisma, PrismaClient } from '@prisma/client';
-import { resolveClient, type TransactionClient } from '../transactions';
-import { rethrowKnownPrismaErrors } from '../prisma-errors';
+import { resolveClient, type TransactionClient } from '../transactions.js';
+import { rethrowKnownPrismaErrors } from '../prisma-errors.js';
 
 export interface StartJobRunParams {
   tradingDateEt: Date;
@@ -65,6 +65,7 @@ export class JobRunRepository {
       });
     } catch (error) {
       rethrowKnownPrismaErrors(error, 'Duplicate job run entry detected');
+      throw error;
     }
   }
 
@@ -88,6 +89,7 @@ export class JobRunRepository {
       });
     } catch (error) {
       rethrowKnownPrismaErrors(error, 'Duplicate job run entry detected');
+      throw error;
     }
   }
 
@@ -111,6 +113,7 @@ export class JobRunRepository {
       });
     } catch (error) {
       rethrowKnownPrismaErrors(error, 'Duplicate job run entry detected');
+      throw error;
     }
   }
 
@@ -136,6 +139,7 @@ export class JobRunRepository {
       });
     } catch (error) {
       rethrowKnownPrismaErrors(error, 'Duplicate job run entry detected');
+      throw error;
     }
   }
 
@@ -173,6 +177,7 @@ export class JobRunRepository {
       });
     } catch (error) {
       rethrowKnownPrismaErrors(error, 'Duplicate job run entry detected');
+      throw error;
     }
   }
 }

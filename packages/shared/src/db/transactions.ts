@@ -2,7 +2,7 @@ import type { PrismaClient, Prisma } from '@prisma/client';
 
 export type TransactionClient = Prisma.TransactionClient;
 
-export interface TransactionOptions extends Prisma.TransactionOptions {}
+export type TransactionOptions = Parameters<PrismaClient['$transaction']>[1];
 
 export const runInTransaction = async <T>(
   client: PrismaClient,

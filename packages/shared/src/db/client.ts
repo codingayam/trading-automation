@@ -1,6 +1,6 @@
 import { PrismaClient, type Prisma } from '@prisma/client';
-import { loadSharedEnv } from '../env';
-import { createLogger } from '../logger';
+import { loadSharedEnv } from '../env.js';
+import { createLogger } from '../logger.js';
 
 const prismaLogger = createLogger({ name: 'prisma' });
 

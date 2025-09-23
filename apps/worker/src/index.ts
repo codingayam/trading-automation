@@ -1,6 +1,6 @@
 import { createLogger, disconnectPrisma, loadWorkerEnv } from '@trading-automation/shared';
 
-import { runOpenJob } from './open-job-runner';
+import { runOpenJob } from './open-job-runner.js';
 
 const fallbackLogger = createLogger({ name: 'worker-bootstrap' });
 

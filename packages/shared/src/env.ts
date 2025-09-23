@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { z } from 'zod';
-import { EnvValidationError } from './errors';
+import { EnvValidationError } from './errors.js';
 
 const loadDotEnv = (() => {
   let loaded = false;

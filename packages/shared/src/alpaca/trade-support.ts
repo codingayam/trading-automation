@@ -1,21 +1,21 @@
-import type { PrismaClient, Trade } from '@prisma/client';
+import type { Prisma, PrismaClient, Trade } from '@prisma/client';
 
-import type { Logger } from '../logger';
-import { createLogger } from '../logger';
-import type { TradeRepository } from '../db/repositories/trade-repository';
-import { runInTransaction, type TransactionClient } from '../db/transactions';
+import type { Logger } from '../logger.js';
+import { createLogger } from '../logger.js';
+import type { TradeRepository } from '../db/repositories/trade-repository.js';
+import { runInTransaction, type TransactionClient } from '../db/transactions.js';
 import {
   AlpacaError,
   AlpacaInsufficientBuyingPowerError,
   AlpacaOrderValidationError,
   TradeGuardrailError,
-} from '../errors';
-import type { AlpacaClient } from './client';
-import { pollOrderStatus } from './polling';
-import { buildTradeUpdateFromOrder } from './status';
-import { assertGuardrails } from './guardrails';
-import type { GuardrailConfig, GuardrailContext, SubmitTradeResult } from './types';
-import type { AlpacaOrder } from './types';
+} from '../errors.js';
+import type { AlpacaClient } from './client.js';
+import { pollOrderStatus } from './polling.js';
+import { buildTradeUpdateFromOrder } from './status.js';
+import { assertGuardrails } from './guardrails.js';
+import type { GuardrailConfig, GuardrailContext, SubmitTradeResult } from './types.js';
+import type { AlpacaOrder } from './types.js';
 
 const DEFAULT_LOGGER = createLogger({ name: 'alpaca-trade-support' });
 
@@ -96,11 +96,12 @@ const markTradeFailure = async (
   now: () => Date,
   details: Record<string, unknown>,
 ) => {
+  const jsonDetails = details as Prisma.InputJsonObject;
   await repository.updateTrade({
     id: tradeId,
     status: 'FAILED',
     failedAt: now(),
-    rawOrderJson: details,
+    rawOrderJson: jsonDetails,
   });
 };
 

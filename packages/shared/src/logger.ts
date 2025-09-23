@@ -1,4 +1,5 @@
-import pino, { type DestinationStream, type Logger, type LoggerOptions } from 'pino';
+import { pino } from 'pino';
+import type { DestinationStream, Logger, LoggerOptions } from 'pino';
 
 export interface CreateLoggerOptions extends LoggerOptions {
   destination?: DestinationStream;

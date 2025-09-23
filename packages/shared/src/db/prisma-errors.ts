@@ -1,5 +1,5 @@
 import { Prisma } from '@prisma/client';
-import { UniqueConstraintViolationError } from '../errors';
+import { UniqueConstraintViolationError } from '../errors.js';
 
 export const isUniqueConstraintError = (error: unknown): error is Prisma.PrismaClientKnownRequestError =>
   error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';

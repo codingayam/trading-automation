@@ -1,6 +1,6 @@
-import { TradeGuardrailError } from '../errors';
-import type { Logger } from '../logger';
-import type { GuardrailConfig, GuardrailContext, GuardrailDecision } from './types';
+import { TradeGuardrailError } from '../errors.js';
+import type { Logger } from '../logger.js';
+import type { GuardrailConfig, GuardrailContext, GuardrailDecision } from './types.js';
 
 const GUARD_TRADING_DISABLED = 'TRADING_DISABLED';
 const GUARD_DAILY_MAX = 'DAILY_MAX_FILINGS';

@@ -16,7 +16,7 @@ import {
 } from '@trading-automation/shared';
 import * as shared from '@trading-automation/shared';
 
-import { runOpenJob } from '../open-job-runner';
+import { runOpenJob } from '../open-job-runner.js';
 
 const FIXTURE_ROOT = resolve(__dirname, '../../../../packages/shared/fixtures');
 
@@ -232,4 +232,3 @@ describe('runOpenJob integration (fixtures)', () => {
     expect(feedEntries).toHaveLength(3);
   });
 });
-

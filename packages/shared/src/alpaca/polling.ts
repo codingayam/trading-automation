@@ -1,10 +1,10 @@
 import type { TradeStatus } from '@prisma/client';
 
-import type { Logger } from '../logger';
-import type { TradeRepository } from '../db/repositories/trade-repository';
-import type { AlpacaClient } from './client';
-import type { AlpacaOrder } from './types';
-import { buildTradeUpdateFromOrder, isTerminalTradeStatus } from './status';
+import type { Logger } from '../logger.js';
+import type { TradeRepository } from '../db/repositories/trade-repository.js';
+import type { AlpacaClient } from './client.js';
+import type { AlpacaOrder } from './types.js';
+import { buildTradeUpdateFromOrder, isTerminalTradeStatus } from './status.js';
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 

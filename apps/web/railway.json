@@ -1,16 +1,13 @@
 {
-  "$schema": "https://schema.railway.com/railway.schema.json",
-  "installCommand": "pnpm install --frozen-lockfile",
-  "buildCommand": "pnpm --filter @trading-automation/web run build",
-  "startCommand": "pnpm --filter @trading-automation/web run start",
-  "healthcheckPath": "/api/health",
+  "$schema": "https://railway.com/railway.schema.json",
+  "build": {
+    "buildCommand": "pnpm -w install --frozen-lockfile && pnpm run prisma:generate && pnpm --filter @trading-automation/shared run build && pnpm --filter @trading-automation/web run build"
+  },
   "deploy": {
-    "regions": ["us-east-1"],
-    "numReplicas": 1,
-    "restartPolicy": "ON_FAILURE",
-    "preDeployCommand": [
-      "pnpm run prisma:generate",
-      "pnpm run migrate"
-    ]
+    "preDeployCommand": "pnpm run prisma:generate && pnpm run migrate",
+    "startCommand": "pnpm --filter @trading-automation/web run start",
+    "healthcheckPath": "/api/health",
+    "healthcheckTimeout": 300,
+    "restartPolicyType": "never"
   }
 }

@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "open-job": "tsx src/index.ts",
-    "build": "tsc -p tsconfig.build.json",
+    "prebuild": "pnpm --filter @trading-automation/shared run prisma:generate && pnpm --filter @trading-automation/shared run build",
+    "build": "tsc --build tsconfig.build.json",
     "lint": "eslint src --ext .ts",
     "test": "vitest run --config ../../vitest.config.ts"
   },

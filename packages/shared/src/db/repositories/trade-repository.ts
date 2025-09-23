@@ -8,8 +8,8 @@ import type {
   TradeTimeInForce,
 } from '@prisma/client';
 import { Prisma as PrismaNamespace } from '@prisma/client';
-import { resolveClient, type TransactionClient } from '../transactions';
-import { rethrowKnownPrismaErrors } from '../prisma-errors';
+import { resolveClient, type TransactionClient } from '../transactions.js';
+import { rethrowKnownPrismaErrors } from '../prisma-errors.js';
 
 type DecimalInput = PrismaNamespace.Decimal | number | string | null | undefined;
 
@@ -29,6 +29,16 @@ const toDecimal = (value: DecimalInput): PrismaNamespace.Decimal | null | undefi
   return new PrismaNamespace.Decimal(value);
 };
 
+const toJsonInput = (
+  value: Prisma.InputJsonValue | Prisma.NullableJsonNullValueInput | null | undefined,
+): Prisma.InputJsonValue | Prisma.NullableJsonNullValueInput | undefined => {
+  if (value === null) {
+    return PrismaNamespace.NullableJsonNullValueInput.DbNull;
+  }
+
+  return value ?? undefined;
+};
+
 export interface CreateTradeAttemptParams {
   sourceHash: string;
   symbol: string;
@@ -42,7 +52,7 @@ export interface CreateTradeAttemptParams {
   clientOrderId?: string | null;
   alpacaOrderId?: string | null;
   submittedAt?: Date | null;
-  rawOrderJson?: Prisma.InputJsonValue | null;
+  rawOrderJson?: Prisma.InputJsonValue | Prisma.NullableJsonNullValueInput | null;
 }
 
 export interface UpdateTradeParams {
@@ -58,7 +68,7 @@ export interface UpdateTradeParams {
   failedAt?: Date | null;
   notionalSubmitted?: DecimalInput;
   qtySubmitted?: DecimalInput;
-  rawOrderJson?: Prisma.InputJsonValue | null;
+  rawOrderJson?: Prisma.InputJsonValue | Prisma.NullableJsonNullValueInput | null;
 }
 
 export interface UpsertTradeParams {
@@ -139,11 +149,12 @@ export class TradeRepository {
           clientOrderId: clientOrderId ?? undefined,
           alpacaOrderId: alpacaOrderId ?? undefined,
           submittedAt: submittedAt ?? undefined,
-          rawOrderJson: rawOrderJson ?? undefined,
+          rawOrderJson: toJsonInput(rawOrderJson),
         },
       });
     } catch (error) {
       rethrowKnownPrismaErrors(error, 'Duplicate trade detected');
+      throw error;
     }
   }
 
@@ -158,6 +169,7 @@ export class TradeRepository {
       });
     } catch (error) {
       rethrowKnownPrismaErrors(error, 'Duplicate trade detected');
+      throw error;
     }
   }
 
@@ -171,6 +183,7 @@ export class TradeRepository {
       });
     } catch (error) {
       rethrowKnownPrismaErrors(error, 'Duplicate trade detected');
+      throw error;
     }
   }
 
@@ -259,6 +272,7 @@ export class TradeRepository {
       });
     } catch (error) {
       rethrowKnownPrismaErrors(error, 'Duplicate trade detected');
+      throw error;
     }
   }
 
@@ -296,7 +310,7 @@ export class TradeRepository {
       clientOrderId: clientOrderId ?? undefined,
       alpacaOrderId: alpacaOrderId ?? undefined,
       submittedAt: submittedAt ?? undefined,
-      rawOrderJson: rawOrderJson ?? undefined,
+      rawOrderJson: toJsonInput(rawOrderJson),
     };
   }
 
@@ -328,7 +342,7 @@ export class TradeRepository {
       failedAt,
       notionalSubmitted: toDecimal(notionalSubmitted),
       qtySubmitted: toDecimal(qtySubmitted),
-      rawOrderJson,
+      rawOrderJson: toJsonInput(rawOrderJson),
     };
   }
 }

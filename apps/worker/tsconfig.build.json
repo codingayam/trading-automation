@@ -6,5 +6,6 @@
     "declarationMap": true,
     "emitDeclarationOnly": false,
     "sourceMap": true
-  }
+  },
+  "exclude": ["src/__tests__/**/*"]
 }

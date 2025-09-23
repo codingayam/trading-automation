@@ -1,5 +1,5 @@
-import type { TradeStatus } from '@prisma/client';
-import type { AlpacaOrder, AlpacaOrderStatus } from './types';
+import type { Prisma, TradeStatus } from '@prisma/client';
+import type { AlpacaOrder, AlpacaOrderStatus } from './types.js';
 
 const STATUS_MAP: Record<AlpacaOrderStatus, TradeStatus> = {
   new: 'NEW',
@@ -33,6 +33,8 @@ export const mapAlpacaStatusToTradeStatus = (status: AlpacaOrderStatus): TradeSt
 
 export const isTerminalTradeStatus = (status: TradeStatus): boolean => TERMINAL_STATUSES.has(status);
 
+const toJsonObject = (order: AlpacaOrder): Prisma.InputJsonValue => order as unknown as Prisma.JsonObject;
+
 export const buildTradeUpdateFromOrder = (order: AlpacaOrder) => ({
   status: mapAlpacaStatusToTradeStatus(order.status),
   clientOrderId: order.client_order_id,
@@ -43,5 +45,5 @@ export const buildTradeUpdateFromOrder = (order: AlpacaOrder) => ({
   filledAt: toDate(order.filled_at ?? undefined),
   canceledAt: toDate(order.canceled_at ?? undefined),
   failedAt: toDate(order.failed_at ?? undefined),
-  rawOrderJson: order,
+  rawOrderJson: toJsonObject(order),
 });

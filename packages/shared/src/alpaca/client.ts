@@ -1,12 +1,12 @@
-import type { Logger } from '../logger';
-import { httpFetch, type HttpFetchOptions } from '../http';
+import type { Logger } from '../logger.js';
+import { httpFetch, type HttpFetchOptions } from '../http.js';
 import {
   AlpacaError,
   AlpacaInsufficientBuyingPowerError,
   AlpacaOrderValidationError,
   type AlpacaErrorDetails,
   HttpRequestError,
-} from '../errors';
+} from '../errors.js';
 import type {
   AlpacaAccount,
   AlpacaCalendarEntry,
@@ -15,7 +15,7 @@ import type {
   AlpacaOrder,
   AlpacaPosition,
   SubmitAlpacaOrderRequest,
-} from './types';
+} from './types.js';
 
 const DEFAULT_TIMEOUT_MS = 15_000;
 const DEFAULT_POLL_TIMEOUT_MS = 60_000;

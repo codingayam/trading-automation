@@ -5,8 +5,8 @@ import type {
   Prisma,
   PrismaClient,
 } from '@prisma/client';
-import { resolveClient, type TransactionClient } from '../transactions';
-import { rethrowKnownPrismaErrors } from '../prisma-errors';
+import { resolveClient, type TransactionClient } from '../transactions.js';
+import { rethrowKnownPrismaErrors } from '../prisma-errors.js';
 
 export interface CreateFeedEntryParams {
   id?: string;
@@ -45,6 +45,7 @@ export class CongressTradeFeedRepository {
       });
     } catch (error) {
       rethrowKnownPrismaErrors(error, 'Duplicate trade feed entry detected');
+      throw error;
     }
   }
 
@@ -65,6 +66,7 @@ export class CongressTradeFeedRepository {
       });
     } catch (error) {
       rethrowKnownPrismaErrors(error, 'Duplicate trade feed entry detected');
+      throw error;
     }
   }
 
