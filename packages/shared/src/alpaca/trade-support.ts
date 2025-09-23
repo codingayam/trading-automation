@@ -230,6 +230,20 @@ export const submitTradeForFiling = async (
       throw error;
     }
 
+    logger.error(
+      {
+        tradeId: trade.id,
+        symbol,
+        errorMessage: error instanceof Error ? error.message : 'Unknown submission error',
+      },
+      'Alpaca rejected notional order with unexpected error',
+    );
+
+    await markTradeFailure(tradeRepository, trade.id, now, {
+      reason: 'NOTIONAL_SUBMISSION_FAILED',
+      error: error instanceof Error ? { name: error.name, message: error.message } : { value: error },
+    });
+
     throw error;
   }
 

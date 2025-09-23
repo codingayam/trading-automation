@@ -417,8 +417,12 @@ export const runOpenJob = async (options: RunOpenJobOptions): Promise<RunOpenJob
     };
   }
 
-  const jobRun = await jobRunRepository.start({ tradingDateEt, summaryJson: { initiatedAt: now().toISOString() } });
-  logger.info({ tradingDateKey, jobRunId: jobRun.id }, 'Started open-job execution');
+  if (!dryRun) {
+    const jobRun = await jobRunRepository.start({ tradingDateEt, summaryJson: { initiatedAt: now().toISOString() } });
+    logger.info({ tradingDateKey, jobRunId: jobRun.id }, 'Started open-job execution');
+  } else {
+    logger.info({ tradingDateKey }, 'Dry-run enabled; skipping job-run persistence');
+  }
 
   const previousCheckpoint = await checkpointRepository.get(previousTradingDateEt);
   const currentCheckpoint = await checkpointRepository.get(tradingDateEt);
@@ -560,6 +564,15 @@ export const runOpenJob = async (options: RunOpenJobOptions): Promise<RunOpenJob
     for (const candidate of windowProcessingFailed ? [] : filingCandidates) {
       tradeSummary.attempted += 1;
 
+      if (dryRun) {
+        tradeSummary.dryRunSkipped += 1;
+        logger.info(
+          { ticker: candidate.ticker, sourceHash: candidate.sourceHash },
+          'Dry-run enabled; skipping trade persistence and submission',
+        );
+        continue;
+      }
+
       let feedRecord;
 
       try {
@@ -587,12 +600,6 @@ export const runOpenJob = async (options: RunOpenJobOptions): Promise<RunOpenJob
           context: { sourceHash: candidate.sourceHash },
         });
         tradeSummary.failures += 1;
-        continue;
-      }
-
-      if (dryRun) {
-        tradeSummary.dryRunSkipped += 1;
-        logger.info({ ticker: candidate.ticker, sourceHash: candidate.sourceHash }, 'Dry-run enabled; skipping trade submission');
         continue;
       }
 
@@ -643,7 +650,7 @@ export const runOpenJob = async (options: RunOpenJobOptions): Promise<RunOpenJob
       current: windowProcessingFailed ? null : currentWindow.end,
     };
 
-    if (!windowProcessingFailed) {
+    if (!dryRun && !windowProcessingFailed) {
       try {
         await checkpointRepository.upsert({
           tradingDateEt: previousTradingDateEt,
@@ -675,14 +682,18 @@ export const runOpenJob = async (options: RunOpenJobOptions): Promise<RunOpenJob
     });
 
     if (errors.length > 0 || tradeSummary.failures > 0) {
-      await jobRunRepository.fail({ tradingDateEt, summaryJson: toInputJsonValue(summary) });
+      if (!dryRun) {
+        await jobRunRepository.fail({ tradingDateEt, summaryJson: toInputJsonValue(summary) });
+      }
       return {
         status: 'failed',
         summary,
       };
     }
 
-    await jobRunRepository.complete({ tradingDateEt, summaryJson: toInputJsonValue(summary) });
+    if (!dryRun) {
+      await jobRunRepository.complete({ tradingDateEt, summaryJson: toInputJsonValue(summary) });
+    }
 
     return {
       status: 'success',
@@ -707,7 +718,9 @@ export const runOpenJob = async (options: RunOpenJobOptions): Promise<RunOpenJob
       errors,
     });
 
-    await jobRunRepository.fail({ tradingDateEt, summaryJson: toInputJsonValue(summary) });
+    if (!dryRun) {
+      await jobRunRepository.fail({ tradingDateEt, summaryJson: toInputJsonValue(summary) });
+    }
 
     return {
       status: 'failed',
