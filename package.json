@@ -15,7 +15,8 @@
     "prisma:generate": "PRISMA_GENERATE_SKIP_AUTOINSTALL=1 prisma generate --schema packages/shared/prisma/schema.prisma",
     "seed": "pnpm exec tsx packages/shared/prisma/seed.ts",
     "format": "prettier --check .",
-    "format:write": "prettier --write ."
+    "format:write": "prettier --write .",
+    "test:e2e": "node tests/e2e/run-all.js"
   },
   "devDependencies": {
     "@types/node": "^20.11.30",

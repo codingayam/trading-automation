@@ -208,3 +208,5 @@ The current price reflected will be based on the following:
 9:30 am ET - 4pm ET - Last trade
 4:00 pm ET - 10:00 pm ET - Last trade based on after-hours trading
 10 pm ET - 4:00 am ET next trading day - Official closing price from the primary exchange at 4 pm ET.
+
+# Retrive market clock

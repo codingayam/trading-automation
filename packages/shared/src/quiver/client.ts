@@ -64,7 +64,7 @@ export class QuiverClient {
       timeoutMs: options.timeoutMs ?? this.defaultTimeoutMs,
       headers: {
         ...(options.headers as Record<string, string>),
-        Authorization: `Bearer ${this.apiKey}`,
+        Authorization: `Token ${this.apiKey}`,
       },
       logger: this.logger,
     });

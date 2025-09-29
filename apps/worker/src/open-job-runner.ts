@@ -32,6 +32,8 @@ interface RunOpenJobOptions {
   logger: Logger;
   dryRun?: boolean;
   now?: () => Date;
+  overrideTradingDate?: Date;
+  force?: boolean;
 }
 
 interface FilingWindow {
@@ -101,7 +103,7 @@ interface RunOpenJobResult {
   summary: JobRunSummary;
 }
 
-const toUpperTicker = (value: string | null | undefined): string | null => {
+export const toUpperTicker = (value: string | null | undefined): string | null => {
   if (!value) {
     return null;
   }
@@ -109,7 +111,7 @@ const toUpperTicker = (value: string | null | undefined): string | null => {
   return trimmed ? trimmed.toUpperCase() : null;
 };
 
-const normalizeMemberName = (value: string | null | undefined): string | null => {
+export const normalizeMemberName = (value: string | null | undefined): string | null => {
   if (!value) {
     return null;
   }
@@ -117,7 +119,7 @@ const normalizeMemberName = (value: string | null | undefined): string | null =>
   return trimmed || null;
 };
 
-const normalizeTransaction = (value: string | null | undefined): CongressTradeTransaction => {
+export const normalizeTransaction = (value: string | null | undefined): CongressTradeTransaction => {
   if (!value) {
     return 'UNKNOWN';
   }
@@ -135,7 +137,7 @@ const normalizeTransaction = (value: string | null | undefined): CongressTradeTr
   return 'UNKNOWN';
 };
 
-const normalizeParty = (value: string | null | undefined): CongressParty | null => {
+export const normalizeParty = (value: string | null | undefined): CongressParty | null => {
   if (!value) {
     return null;
   }
@@ -220,7 +222,7 @@ const createGuardrailConfig = (env: Readonly<WorkerEnv>): GuardrailConfig => ({
   perTickerDailyMax: env.PER_TICKER_DAILY_MAX ?? undefined,
 });
 
-const collectDatesForWindow = (window: FilingWindow): Date[] => {
+export const collectDatesForWindow = (window: FilingWindow): Date[] => {
   const dates: Date[] = [];
   let cursor = startOfEasternDay(window.start);
   const end = startOfEasternDay(window.end);
@@ -273,7 +275,7 @@ const toJobRunSummary = (params: {
 });
 
 export const runOpenJob = async (options: RunOpenJobOptions): Promise<RunOpenJobResult> => {
-  const { env, logger, dryRun = false, now = () => new Date() } = options;
+  const { env, logger, dryRun = false, now = () => new Date(), overrideTradingDate, force = false } = options;
 
   const prisma = getPrismaClient();
   const guardrailConfig = createGuardrailConfig(env);
@@ -300,10 +302,14 @@ export const runOpenJob = async (options: RunOpenJobOptions): Promise<RunOpenJob
   const errors: Array<{ message: string; context?: Record<string, unknown> }> = [];
 
   const clock = await alpacaClient.getClock();
-  const tradingDateEt = startOfEasternDay(ensureDate(clock.timestamp));
+  const tradingDateEt = overrideTradingDate ? startOfEasternDay(overrideTradingDate) : startOfEasternDay(ensureDate(clock.timestamp));
   const tradingDateKey = formatDateKey(tradingDateEt);
 
-  if (!clock.is_open) {
+  if (overrideTradingDate) {
+    logger.info({ tradingDateKey }, 'Using manual trading date override for run');
+  }
+
+  if (!overrideTradingDate && !force && !clock.is_open) {
     logger.info({ tradingDateKey, clock }, 'Market is not open; skipping open-job execution');
     return {
       status: 'skipped',
@@ -331,7 +337,7 @@ export const runOpenJob = async (options: RunOpenJobOptions): Promise<RunOpenJob
 
   const existingRun = await jobRunRepository.getByTradingDate(tradingDateEt);
 
-  if (existingRun && existingRun.status !== 'FAILED') {
+  if (!overrideTradingDate && !force && existingRun && existingRun.status !== 'FAILED') {
     logger.warn({ tradingDateKey, existingRunId: existingRun.id }, 'Job run already exists for trading date; skipping execution');
     return {
       status: 'skipped',
@@ -437,11 +443,24 @@ export const runOpenJob = async (options: RunOpenJobOptions): Promise<RunOpenJob
 
   const currentOpenTime = parseCalendarTime(calendarEntry.date, calendarEntry.open ?? calendarEntry.session_open ?? null);
 
+  const tradingDayStart = startOfEasternDay(tradingDateEt);
+  const gapAwareStart = startOfEasternDay(addEasternDays(previousTradingDateEt, 1));
+
+  let currentWindowStart: Date;
+
+  if (currentCheckpoint?.lastFiledTsProcessedEt) {
+    currentWindowStart = new Date(currentCheckpoint.lastFiledTsProcessedEt.getTime() + 1);
+  } else {
+    currentWindowStart = gapAwareStart.getTime() < tradingDayStart.getTime() ? gapAwareStart : tradingDayStart;
+  }
+
+  if (currentWindowStart.getTime() > currentOpenTime.getTime()) {
+    currentWindowStart = new Date(currentOpenTime.getTime());
+  }
+
   const currentWindow: FilingWindow = {
     label: 'current',
-    start: currentCheckpoint?.lastFiledTsProcessedEt
-      ? new Date(currentCheckpoint.lastFiledTsProcessedEt.getTime() + 1)
-      : startOfEasternDay(tradingDateEt),
+    start: currentWindowStart,
     end: currentOpenTime,
   };
 

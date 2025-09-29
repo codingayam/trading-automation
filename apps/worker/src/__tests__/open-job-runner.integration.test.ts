@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import { Prisma, PrismaClient } from '@prisma/client';
 import { PrismockClient } from 'prismock';
 import { beforeEach, describe, expect, it, vi, afterEach } from 'vitest';
+import type { SpyInstance } from 'vitest';
 
 import {
   AlpacaClient,
@@ -90,6 +91,9 @@ const deepClone = <T>(value: T): T => JSON.parse(JSON.stringify(value));
 describe('runOpenJob integration (fixtures)', () => {
   let prisma: PrismaClient;
   let env: Readonly<WorkerEnv>;
+  let quiverSpy: SpyInstance;
+  let clockSpy: SpyInstance;
+  let calendarSpy: SpyInstance;
 
   beforeEach(() => {
     prisma = new PrismockClient() as unknown as PrismaClient;
@@ -116,8 +120,10 @@ describe('runOpenJob integration (fixtures)', () => {
       ...alpacaCalendarFixture,
     ];
 
-    vi.spyOn(AlpacaClient.prototype, 'getClock').mockResolvedValue(deepClone(alpacaClockFixture));
-    vi.spyOn(AlpacaClient.prototype, 'getCalendar').mockImplementation(async () => deepClone(calendarResponse));
+    clockSpy = vi.spyOn(AlpacaClient.prototype, 'getClock');
+    clockSpy.mockResolvedValue(deepClone(alpacaClockFixture));
+    calendarSpy = vi.spyOn(AlpacaClient.prototype, 'getCalendar');
+    calendarSpy.mockImplementation(async () => deepClone(calendarResponse));
 
     const orderQueues = new Map<string, Array<Record<string, unknown>>>();
 
@@ -190,16 +196,166 @@ describe('runOpenJob integration (fixtures)', () => {
       return cloned as typeof alpacaLatestTradeFixture;
     });
 
-    vi.spyOn(QuiverClient.prototype, 'getCongressTradingByDate').mockImplementation(async ({ date }) => {
+    quiverSpy = vi.spyOn(QuiverClient.prototype, 'getCongressTradingByDate');
+    quiverSpy.mockImplementation(async ({ date }) => {
       const resolvedDate = date instanceof Date ? formatDateKey(date) : date;
       const fixture = quiverFixtures[resolvedDate];
-      return fixture ? deepClone(fixture) as Record<string, unknown>[] : [];
+      return fixture ? (deepClone(fixture) as Record<string, unknown>[]) : [];
     });
   });
 
   afterEach(async () => {
     vi.restoreAllMocks();
     await prisma.$disconnect();
+  });
+
+  it('does not resubmit trades when re-run on the same trading date', async () => {
+    const logger = createLogger({ level: 'fatal' });
+    const now = () => new Date('2024-02-16T14:30:00.000Z');
+
+    const firstRun = await runOpenJob({ env, logger, now });
+    expect(firstRun.status).toBe('success');
+
+    const tradesAfterFirstRun = await prisma.trade.findMany();
+    expect(tradesAfterFirstRun).toHaveLength(3);
+
+    quiverSpy.mockClear();
+
+    const secondRun = await runOpenJob({ env, logger, now });
+
+    expect(secondRun.status).toBe('success');
+    expect(secondRun.summary.trades.attempted).toBe(0);
+    expect(secondRun.summary.trades.submitted).toBe(0);
+    expect(secondRun.summary.errors).toEqual([]);
+    const [previousWindow, currentWindow] = secondRun.summary.windows;
+    expect(previousWindow?.filingsFetched).toBe(0);
+    expect(currentWindow?.filingsConsidered).toBe(0);
+    expect(quiverSpy).toHaveBeenCalled();
+
+    const tradesAfterSecondRun = await prisma.trade.findMany();
+    expect(tradesAfterSecondRun).toHaveLength(tradesAfterFirstRun.length);
+
+    const jobRuns = await prisma.jobRun.findMany({ orderBy: { createdAt: 'asc' } });
+    expect(jobRuns).toHaveLength(2);
+    expect(jobRuns[0]?.status).toBe('SUCCESS');
+    expect(jobRuns[1]?.status).toBe('SUCCESS');
+  });
+
+  it('marks filings that fall outside the trading window', async () => {
+    const logger = createLogger({ level: 'fatal' });
+    const now = () => new Date('2024-02-16T14:30:00.000Z');
+    const lateRecord: Record<string, unknown> = {
+      Ticker: 'AAPL',
+      Name: 'Rep. Late Filing',
+      Transaction: 'Purchase',
+      Filed: '2024-02-17',
+      Traded: '2024-02-17',
+      Party: 'D',
+    };
+
+    quiverSpy.mockImplementation(async ({ date }) => {
+      const resolvedDate = date instanceof Date ? formatDateKey(date) : date;
+      if (resolvedDate === '2024-02-15') {
+        return [lateRecord];
+      }
+      return [];
+    });
+
+    const result = await runOpenJob({ env, logger, now });
+
+    expect(result.status).toBe('success');
+    expect(result.summary.errors).toEqual([]);
+    const [previousWindow, currentWindow] = result.summary.windows;
+    expect(previousWindow?.filingsFetched).toBe(1);
+    expect(previousWindow?.filingsConsidered).toBe(0);
+    expect(previousWindow?.outsideWindow).toBe(1);
+    expect(currentWindow?.filingsFetched).toBe(0);
+    expect(result.summary.trades.submitted).toBe(0);
+
+    const checkpoints = await prisma.ingestCheckpoint.findMany({ orderBy: { tradingDateEt: 'asc' } });
+    expect(checkpoints).toHaveLength(2);
+  });
+
+  it('fetches filings that fall on non-trading days between sessions', async () => {
+    const logger = createLogger({ level: 'fatal' });
+    const now = () => new Date('2024-02-19T14:29:55.000Z');
+
+    const saturdayRecord: Record<string, unknown> = {
+      Ticker: 'TSLA',
+      Name: 'Rep. Saturday Filing',
+      Transaction: 'Purchase',
+      Filed: '2024-02-17',
+      Traded: '2024-02-16',
+      Party: 'R',
+    };
+
+    const sundayRecord: Record<string, unknown> = {
+      Ticker: 'MSFT',
+      Name: 'Rep. Sunday Filing',
+      Transaction: 'Purchase',
+      Filed: '2024-02-18',
+      Traded: '2024-02-18',
+      Party: 'D',
+    };
+
+    const originalSaturday = quiverFixtures['2024-02-17'];
+    const originalSunday = quiverFixtures['2024-02-18'];
+
+    quiverFixtures['2024-02-17'] = [saturdayRecord];
+    quiverFixtures['2024-02-18'] = [sundayRecord];
+
+    clockSpy.mockResolvedValueOnce({
+      timestamp: '2024-02-19T14:29:55.000Z',
+      is_open: true,
+      next_open: '2024-02-20T14:30:00.000Z',
+      next_close: '2024-02-19T21:00:00.000Z',
+    });
+
+    calendarSpy.mockResolvedValueOnce([
+      {
+        date: '2024-02-16',
+        open: '09:30',
+        close: '16:00',
+        session_open: '04:00',
+        session_close: '20:00',
+      },
+      {
+        date: '2024-02-19',
+        open: '09:30',
+        close: '16:00',
+        session_open: '04:00',
+        session_close: '20:00',
+      },
+    ]);
+
+    try {
+      const result = await runOpenJob({ env, logger, now, dryRun: true });
+
+      expect(result.status).toBe('success');
+
+      const requestedDates = quiverSpy.mock.calls.map(([params]) =>
+        formatDateKey(params.date instanceof Date ? params.date : new Date(params.date as string)),
+      );
+
+      expect(requestedDates).toEqual(expect.arrayContaining(['2024-02-17', '2024-02-18', '2024-02-19']));
+
+      const currentWindowSummary = result.summary.windows.find((window) => window.label === 'current');
+      expect(currentWindowSummary?.filingsFetched).toBeGreaterThanOrEqual(2);
+      expect(currentWindowSummary?.filingsConsidered).toBe(2);
+      expect(result.summary.trades.dryRunSkipped).toBeGreaterThanOrEqual(2);
+    } finally {
+      if (originalSaturday) {
+        quiverFixtures['2024-02-17'] = originalSaturday;
+      } else {
+        delete quiverFixtures['2024-02-17'];
+      }
+
+      if (originalSunday) {
+        quiverFixtures['2024-02-18'] = originalSunday;
+      } else {
+        delete quiverFixtures['2024-02-18'];
+      }
+    }
   });
 
   it('processes Quiver filings and records trades using Alpaca fixtures', async () => {
